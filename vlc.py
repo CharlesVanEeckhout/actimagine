@@ -122,6 +122,7 @@ for (l, b) in zip(total_zeros_len, total_zeros_bits, strict=True):
 
 
 run_len = [
+    [],
     [1,1],
     [1,2,2],
     [2,2,2,2],
@@ -132,6 +133,7 @@ run_len = [
 run7_len = [3,3,3,3,3,3,3,4,5,6,7,8,9,10,11]
 
 run_bits = [
+    [],
     [1,0],
     [1,1,0],
     [3,2,1,0],

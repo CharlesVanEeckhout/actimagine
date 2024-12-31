@@ -2474,6 +2474,289 @@ def total_zeros_vlc_1():
     test_vlc(expected_results, vlc.total_zeros_vlc[1])
 
 
+def total_zeros_vlc_2():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 13, "end_index": 6},
+        {"gb_buffer": "000001000", "code": 11, "end_index": 6},
+        {"gb_buffer": "000010000", "code": 12, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 10, "end_index": 5},
+        {"gb_buffer": "000110000", "code": 9, "end_index": 5},
+        {"gb_buffer": "001000000", "code": 8, "end_index": 4},
+        {"gb_buffer": "001100000", "code": 5, "end_index": 4},
+        {"gb_buffer": "010000000", "code": 4, "end_index": 4},
+        {"gb_buffer": "010100000", "code": 0, "end_index": 4},
+        {"gb_buffer": "011000000", "code": 7, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "101000000", "code": 3, "end_index": 3},
+        {"gb_buffer": "110000000", "code": 2, "end_index": 3},
+        {"gb_buffer": "111000000", "code": 1, "end_index": 3},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[2])
+
+
+def total_zeros_vlc_3():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 12, "end_index": 5},
+        {"gb_buffer": "000010000", "code": 11, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 10, "end_index": 5},
+        {"gb_buffer": "000110000", "code": 0, "end_index": 5},
+        {"gb_buffer": "001000000", "code": 9, "end_index": 4},
+        {"gb_buffer": "001100000", "code": 7, "end_index": 4},
+        {"gb_buffer": "010000000", "code": 3, "end_index": 4},
+        {"gb_buffer": "010100000", "code": 2, "end_index": 4},
+        {"gb_buffer": "011000000", "code": 8, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "101000000", "code": 5, "end_index": 3},
+        {"gb_buffer": "110000000", "code": 4, "end_index": 3},
+        {"gb_buffer": "111000000", "code": 1, "end_index": 3},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[3])
+
+
+def total_zeros_vlc_4():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 11, "end_index": 5},
+        {"gb_buffer": "000010000", "code": 9, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 10, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 8, "end_index": 4},
+        {"gb_buffer": "001100000", "code": 2, "end_index": 4},
+        {"gb_buffer": "010000000", "code": 1, "end_index": 4},
+        {"gb_buffer": "010100000", "code": 0, "end_index": 4},
+        {"gb_buffer": "011000000", "code": 7, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "101000000", "code": 5, "end_index": 3},
+        {"gb_buffer": "110000000", "code": 4, "end_index": 3},
+        {"gb_buffer": "111000000", "code": 3, "end_index": 3},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[4])
+
+
+def total_zeros_vlc_5():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 10, "end_index": 6},
+        {"gb_buffer": "000001000", "code": 0, "end_index": 6},
+        {"gb_buffer": "000010000", "code": 1, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 8, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 9, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 7, "end_index": 3},
+        {"gb_buffer": "011000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 5, "end_index": 3},
+        {"gb_buffer": "101000000", "code": 4, "end_index": 3},
+        {"gb_buffer": "110000000", "code": 3, "end_index": 3},
+        {"gb_buffer": "111000000", "code": 2, "end_index": 3},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[5])
+
+
+def total_zeros_vlc_6():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 9, "end_index": 6},
+        {"gb_buffer": "000001000", "code": 0, "end_index": 6},
+        {"gb_buffer": "000010000", "code": 1, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 7, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 8, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "011000000", "code": 4, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 3, "end_index": 3},
+        {"gb_buffer": "101000000", "code": 2, "end_index": 3},
+        {"gb_buffer": "110000000", "code": 5, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[6])
+
+
+def total_zeros_vlc_7():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 8, "end_index": 6},
+        {"gb_buffer": "000001000", "code": 0, "end_index": 6},
+        {"gb_buffer": "000010000", "code": 2, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 1, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 7, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "011000000", "code": 3, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 5, "end_index": 2},
+        {"gb_buffer": "110000000", "code": 4, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[7])
+
+
+def total_zeros_vlc_8():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 1, "end_index": 6},
+        {"gb_buffer": "000001000", "code": 0, "end_index": 6},
+        {"gb_buffer": "000010000", "code": 7, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 2, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 5, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 6, "end_index": 2},
+        {"gb_buffer": "100000000", "code": 4, "end_index": 2},
+        {"gb_buffer": "110000000", "code": 3, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[8])
+
+
+def total_zeros_vlc_9():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 1, "end_index": 5},
+        {"gb_buffer": "000010000", "code": 0, "end_index": 5},
+        {"gb_buffer": "000100000", "code": 6, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 2, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 5, "end_index": 2},
+        {"gb_buffer": "100000000", "code": 4, "end_index": 2},
+        {"gb_buffer": "110000000", "code": 3, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[9])
+
+
+def total_zeros_vlc_10():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 0, "end_index": 4},
+        {"gb_buffer": "000100000", "code": 1, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 2, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 3, "end_index": 3},
+        {"gb_buffer": "011000000", "code": 5, "end_index": 3},
+        {"gb_buffer": "100000000", "code": 4, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[10])
+
+
+def total_zeros_vlc_11():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 0, "end_index": 4},
+        {"gb_buffer": "000100000", "code": 1, "end_index": 4},
+        {"gb_buffer": "001000000", "code": 4, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 2, "end_index": 2},
+        {"gb_buffer": "100000000", "code": 3, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[11])
+
+
+def total_zeros_vlc_12():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 0, "end_index": 3},
+        {"gb_buffer": "001000000", "code": 1, "end_index": 3},
+        {"gb_buffer": "010000000", "code": 3, "end_index": 2},
+        {"gb_buffer": "100000000", "code": 2, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[12])
+
+
+def total_zeros_vlc_13():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 0, "end_index": 2},
+        {"gb_buffer": "010000000", "code": 1, "end_index": 2},
+        {"gb_buffer": "100000000", "code": 2, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[13])
+
+
+def total_zeros_vlc_14():
+    expected_results = [
+        {"gb_buffer": "000000000", "code": 0, "end_index": 1},
+        {"gb_buffer": "100000000", "code": 1, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.total_zeros_vlc[14])
+
+def run_vlc_1():
+    expected_results = [
+        {"gb_buffer": "000", "code": 1, "end_index": 1},
+        {"gb_buffer": "100", "code": 0, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.run_vlc[1])
+
+def run_vlc_2():
+    expected_results = [
+        {"gb_buffer": "000", "code": 2, "end_index": 2},
+        {"gb_buffer": "010", "code": 1, "end_index": 2},
+        {"gb_buffer": "100", "code": 0, "end_index": 1},
+    ]
+    
+    test_vlc(expected_results, vlc.run_vlc[2])
+
+def run_vlc_3():
+    expected_results = [
+        {"gb_buffer": "000", "code": 3, "end_index": 2},
+        {"gb_buffer": "010", "code": 2, "end_index": 2},
+        {"gb_buffer": "100", "code": 1, "end_index": 2},
+        {"gb_buffer": "110", "code": 0, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.run_vlc[3])
+
+def run_vlc_4():
+    expected_results = [
+        {"gb_buffer": "000", "code": 4, "end_index": 3},
+        {"gb_buffer": "001", "code": 3, "end_index": 3},
+        {"gb_buffer": "010", "code": 2, "end_index": 2},
+        {"gb_buffer": "100", "code": 1, "end_index": 2},
+        {"gb_buffer": "110", "code": 0, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.run_vlc[4])
+
+def run_vlc_5():
+    expected_results = [
+        {"gb_buffer": "000", "code": 5, "end_index": 3},
+        {"gb_buffer": "001", "code": 4, "end_index": 3},
+        {"gb_buffer": "010", "code": 3, "end_index": 3},
+        {"gb_buffer": "011", "code": 2, "end_index": 3},
+        {"gb_buffer": "100", "code": 1, "end_index": 2},
+        {"gb_buffer": "110", "code": 0, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.run_vlc[5])
+
+def run_vlc_6():
+    expected_results = [
+        {"gb_buffer": "000", "code": 1, "end_index": 3},
+        {"gb_buffer": "001", "code": 2, "end_index": 3},
+        {"gb_buffer": "010", "code": 4, "end_index": 3},
+        {"gb_buffer": "011", "code": 3, "end_index": 3},
+        {"gb_buffer": "100", "code": 6, "end_index": 3},
+        {"gb_buffer": "101", "code": 5, "end_index": 3},
+        {"gb_buffer": "110", "code": 0, "end_index": 2},
+    ]
+    
+    test_vlc(expected_results, vlc.run_vlc[6])
+
+def run7_vlc():
+    expected_results = [
+        {"gb_buffer": "000000000000", "code": -1, "end_index": 6},
+        {"gb_buffer": "000000000001", "code": -1, "end_index": 6},
+        {"gb_buffer": "000000000010", "code": 14, "end_index": 11},
+        {"gb_buffer": "000000000100", "code": 13, "end_index": 10},
+        {"gb_buffer": "000000001000", "code": 12, "end_index": 9},
+        {"gb_buffer": "000000010000", "code": 11, "end_index": 8},
+        {"gb_buffer": "000000100000", "code": 10, "end_index": 7},
+        {"gb_buffer": "000001000000", "code": 9, "end_index": 6},
+        {"gb_buffer": "000010000000", "code": 8, "end_index": 5},
+        {"gb_buffer": "000100000000", "code": 7, "end_index": 4},
+        {"gb_buffer": "001000000000", "code": 6, "end_index": 3},
+        {"gb_buffer": "010000000000", "code": 5, "end_index": 3},
+        {"gb_buffer": "011000000000", "code": 4, "end_index": 3},
+        {"gb_buffer": "100000000000", "code": 3, "end_index": 3},
+        {"gb_buffer": "101000000000", "code": 2, "end_index": 3},
+        {"gb_buffer": "110000000000", "code": 1, "end_index": 3},
+        {"gb_buffer": "111000000000", "code": 0, "end_index": 3},
+    ]
+    
+    test_vlc(expected_results, vlc.run7_vlc)
+
+
+
+
 tests = [
     coeff_token_vlc_0,
     coeff_token_vlc_1,
@@ -2481,6 +2764,26 @@ tests = [
     coeff_token_vlc_3,
     total_zeros_vlc_0,
     total_zeros_vlc_1,
+    total_zeros_vlc_2,
+    total_zeros_vlc_3,
+    total_zeros_vlc_4,
+    total_zeros_vlc_5,
+    total_zeros_vlc_6,
+    total_zeros_vlc_7,
+    total_zeros_vlc_8,
+    total_zeros_vlc_9,
+    total_zeros_vlc_10,
+    total_zeros_vlc_11,
+    total_zeros_vlc_12,
+    total_zeros_vlc_13,
+    total_zeros_vlc_14,
+    run_vlc_1,
+    run_vlc_2,
+    run_vlc_3,
+    run_vlc_4,
+    run_vlc_5,
+    run_vlc_6,
+    run7_vlc,
 ]
 
 def main():

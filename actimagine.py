@@ -6,6 +6,7 @@ import numpy as np
 import read
 import vlc
 
+
 ff_actimagine_vx_residu_mask_new_tab = [
     0x00, 0x08, 0x04, 0x02, 0x01, 0x1F, 0x0F, 0x0A,
     0x05, 0x0C, 0x03, 0x10, 0x0E, 0x0D, 0x0B, 0x07,
@@ -31,6 +32,14 @@ ff_h264_cavlc_coeff_token_table_index = [
 ff_h264_cavlc_suffix_limit = [
     0, 3, 6, 12, 24, 48, 0x8000
 ]
+
+# ff_zigzag_scan with swapped 2bit
+zigzag_scan = [
+    0*4+0, 1*4+0, 0*4+1, 0*4+2,
+    1*4+1, 2*4+0, 3*4+0, 2*4+1,
+    1*4+2, 0*4+3, 1*4+3, 2*4+2,
+    3*4+1, 3*4+2, 2*4+3, 3*4+3,
+];
 
 
 """
@@ -66,6 +75,9 @@ ff_h264_cavlc_suffix_limit = [
 def mid_pred(a, b, c):
     return sorted([a, b, c])[1]
 
+def av_clip_pixel(x):
+    return mid_pred(0, x, 255)
+
 
 class ActImagine:
     def __init__(self):
@@ -76,7 +88,7 @@ class ActImagine:
         with open(filename, "rb") as f:
             data = f.read()
 
-        reader = DataReader(data, 0)
+        reader = read.DataReader(data, 0)
 
 
         self.file_signature = reader.bytes(4)
@@ -94,7 +106,7 @@ class ActImagine:
 
 
         self.audio_extradata = {}
-        reader_temp = DataReader(data, self.audio_extradata_offset)
+        reader_temp = read.DataReader(data, self.audio_extradata_offset)
 
         self.audio_extradata["lpc_codebooks"] = []
         for i in range(3):
@@ -116,12 +128,25 @@ class ActImagine:
 
 
         self.seek_table = []
-        reader_temp = DataReader(data, self.seek_table_offset)
+        reader_temp = read.DataReader(data, self.seek_table_offset)
         for i in range(self.seek_table_entries_qty):
             self.seek_table.append({
                 "frame_id": reader_temp.int(4),
                 "frame_offset": reader_temp.int(4)
             })
+        
+        
+        self.qtab = []
+        if self.quantiser < 12 or self.quantiser > 161:
+            raise Exception("quantiser " + str(self.quantiser) + " was out of bounds")
+        qx = self.quantiser % 6
+        qy = self.quantiser // 6
+        
+        for i in range(2):
+            self.qtab.append([])
+            for j in range(4):
+                self.qtab[i].append(quant4x4_tab[qx][4 * i + j] << qy)
+        
         
         self.frames = []
         for i in range(self.frames_qty):
@@ -154,10 +179,10 @@ class ActImagine:
                     callback(x, y, plane, **kwargs)
 
     def frame_coeff_getter(self, frame_coeff, plane, x, y):
-        return self.frame_image_getter(self, frame_coeff, plane, x // 4 + 1, y // 4 + 1)
+        return self.frame_image_getter(frame_coeff, plane, x // 4 + 1, y // 4 + 1)
         
     def frame_coeff_setter(self, frame_coeff, plane, x, y, value):
-        self.frame_image_setter(self, frame_coeff, plane, x // 4 + 1, y // 4 + 1, value)
+        self.frame_image_setter(frame_coeff, plane, x // 4 + 1, y // 4 + 1, value)
 
 
     def predict_inter(self, reader, block, pred_vec, has_delta, ref_frame_image):
@@ -277,18 +302,162 @@ class ActImagine:
                 residu_mask = ff_actimagine_vx_residu_mask_new_tab[residu_mask_tab_index]
                 print("residu block (" + str(x) + ", " + str(y) + ") mask " + "{:05b}".format(residu_mask))
                 
-                raise Exception("unimplemented decode_residu_blocks")
+                if residu_mask & 1 != 0:
+                    coeff_left = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x  -1, block["y"]+y    )
+                    coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x    , block["y"]+y  -1)
+                    nc = int((coeff_left + coeff_top + 1) // 2)
+                    out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x  , block["y"]+y  , nc, "y")
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y  , out_total_coeff)
+                else:
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y  , 0)
                 
-                if residu_mask & 1:
-                    nc = None # todo
-                    self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc)
+                if residu_mask & 2 != 0:
+                    coeff_left = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x+4-1, block["y"]+y    )
+                    coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x+4  , block["y"]+y  -1)
+                    nc = int((coeff_left + coeff_top + 1) // 2)
+                    out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x+4, block["y"]+y  , nc, "y")
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y  , out_total_coeff)
+                else:
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y  , 0)
                 
+                if residu_mask & 4 != 0:
+                    coeff_left = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x  -1, block["y"]+y+4  )
+                    coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x    , block["y"]+y+4-1)
+                    nc = int((coeff_left + coeff_top + 1) // 2)
+                    out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x  , block["y"]+y+4, nc, "y")
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y+4, out_total_coeff)
+                else:
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y+4, 0)
                 
-        raise Exception("unimplemented decode_residu_blocks")
+                if residu_mask & 8 != 0:
+                    coeff_left = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x+4-1, block["y"]+y+4  )
+                    coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x+4  , block["y"]+y+4-1)
+                    nc = int((coeff_left + coeff_top + 1) // 2)
+                    out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x+4, block["y"]+y+4, nc, "y")
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y+4, out_total_coeff)
+                else:
+                    self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y+4, 0)
+                
+                if residu_mask & 16 != 0:
+                    coeff_left = self.frame_coeff_getter(self.frame_coeffs, "uv", block["x"]+x-1, block["y"]+y  )
+                    coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "uv", block["x"]+x  , block["y"]+y-1)
+                    nc = int((coeff_left + coeff_top + 1) // 2)
+                    out_total_coeff_u = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "u")
+                    out_total_coeff_v = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "v")
+                    out_total_coeff = int((out_total_coeff_u + out_total_coeff_v + 1) // 2)
+                    self.frame_coeff_setter(self.frame_coeffs, "uv", block["x"]+x, block["y"]+y, out_total_coeff)
+                else:
+                    self.frame_coeff_setter(self.frame_coeffs, "uv", block["x"]+x, block["y"]+y, 0)
 
-    def decode_residu_cavlc(self, reader, x, y, nc):
-        coeff_token = reader.vlc2(FF_H264_CAVLC_COEFF_TOKEN_VLC_BITS, 2)
-        raise Exception("unimplemented decode_residu_cavlc")
+    def decode_residu_cavlc(self, reader, x, y, nc, plane):
+        coeff_token = reader.vlc2(vlc.coeff_token_vlc[ff_h264_cavlc_coeff_token_table_index[nc]])
+        if coeff_token == -1:
+            raise Exception("invalid vlc")
+        
+        trailing_ones = coeff_token & 3
+        total_coeff   = coeff_token >> 2
+        out_total_coeff = total_coeff
+        
+        level = []
+        if total_coeff == 0:
+            return out_total_coeff
+        elif total_coeff == 16:
+            zeros_left = 0
+        else:
+            zeros_left = reader.vlc2(vlc.total_zeros_vlc[total_coeff])
+            for i in range(16 - (total_coeff + zeros_left)):
+                level.insert(0, 0)
+        
+        suffix_length = 0
+        while True:
+            if trailing_ones > 0:
+                trailing_ones -= 1
+                level.insert(0, [-1, 1][reader.bit()])
+            else:
+                level_prefix = 0
+                while reader.bit() == 0:
+                    level_prefix += 1
+                
+                if level_prefix == 15:
+                    level_suffix = reader.int(11)
+                else:
+                    level_suffix = reader.int(suffix_length)
+                
+                level_code = level_suffix + (level_prefix << suffix_length) + 1
+                
+                suffix_length += 1 if level_code > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
+                
+                if reader.bit() == 1:
+                    level_code = -level_code
+                level.insert(0, level_code)
+            
+            total_coeff -= 1
+            if total_coeff == 0:
+                break
+            
+            if zeros_left == 0:
+                continue
+            
+            if zeros_left < 7:
+                run_before = reader.vlc2(vlc.run_vlc[zeros_left])
+            else:
+                run_before = reader.vlc2(vlc.run7_vlc)
+            
+            zeros_left -= run_before
+            for i in range(run_before):
+                level.insert(0, 0)
+        
+        for i in range(zeros_left):
+            level.insert(0, 0)
+        
+        self.decode_dct(reader, x, y, plane, level)
+        return out_total_coeff
+
+    def decode_dct(self, reader, x, y, plane, level):
+        dct = [None] * len(zigzag_scan)
+        
+        # dezigzag
+        for i, z in enumerate(zigzag_scan):
+            dct[z] = level[i]
+        
+        # dequantize
+        for i in range(2):
+            for j in range(4):
+                dct[4*j + i] *= self.qtab[i][j]
+                dct[4*j + i + 2] *= self.qtab[i][j]
+        
+        # h264_idct_add
+        step = 2
+        if plane == "y":
+            step = 1
+        
+        dct[0] += 1 << 5
+        
+        for i in range(4):
+            z0 =  dct[i + 4*0]     +  dct[i + 4*2]
+            z1 =  dct[i + 4*0]     -  dct[i + 4*2]
+            z2 = (dct[i + 4*1]//2) -  dct[i + 4*3]
+            z3 =  dct[i + 4*1]     + (dct[i + 4*3]//2)
+            
+            dct[i + 4*0] = z0 + z3
+            dct[i + 4*1] = z1 + z2
+            dct[i + 4*2] = z1 - z2
+            dct[i + 4*3] = z0 - z3
+        
+        for i in range(4):
+            z0 =  dct[0 + 4*i]     +  dct[2 + 4*i]
+            z1 =  dct[0 + 4*i]     -  dct[2 + 4*i]
+            z2 = (dct[1 + 4*i]//2) -  dct[3 + 4*i]
+            z3 =  dct[1 + 4*i]     + (dct[3 + 4*i]//2)
+            
+            p = av_clip_pixel(self.frame_image_getter(self.frame_image, plane, x+step*i, y+step*0) + ((z0 + z3) >> 6))
+            self.frame_image_setter(self.frame_image, plane, x+step*i, y+step*0, p)
+            p = av_clip_pixel(self.frame_image_getter(self.frame_image, plane, x+step*i, y+step*1) + ((z1 + z2) >> 6))
+            self.frame_image_setter(self.frame_image, plane, x+step*i, y+step*1, p)
+            p = av_clip_pixel(self.frame_image_getter(self.frame_image, plane, x+step*i, y+step*2) + ((z1 - z2) >> 6))
+            self.frame_image_setter(self.frame_image, plane, x+step*i, y+step*2, p)
+            p = av_clip_pixel(self.frame_image_getter(self.frame_image, plane, x+step*i, y+step*3) + ((z0 - z3) >> 6))
+            self.frame_image_setter(self.frame_image, plane, x+step*i, y+step*3, p)
 
 
     def clear_total_coeff(self, block):
@@ -336,7 +505,7 @@ class ActImagine:
             }
             
             # read bits from little endian uint16 list from msb to lsb
-            reader = BitsReader(np.unpackbits([byte for i in range(0, len(frame_object["data"])-1, 2) for byte in reversed(frame_object["data"][i:i+2])]), 0)
+            reader = read.BitsReader(np.unpackbits([byte for i in range(0, len(frame_object["data"])-1, 2) for byte in reversed(frame_object["data"][i:i+2])]), 0)
             
             while len(frame_blocks) > 0:
                 block = frame_blocks.pop(0)
@@ -357,7 +526,7 @@ class ActImagine:
                 
                 mode = reader.unsigned_expgolomb()
                 print(mode)
-                if mode == 0:
+                if mode == 0: # v-split, no residu
                     if block["w"] == 2:
                         raise Exception("cannot v-split block further")
                     frame_blocks = [{
@@ -373,11 +542,11 @@ class ActImagine:
                     }] + frame_blocks
                     if block["w"] >= 8 and block["h"] >= 8:
                         self.clear_total_coeff(block)
-                elif mode == 1:
+                elif mode == 1: # no delta, no residu, ref 0
                     self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[0])
                     if block["w"] >= 8 and block["h"] >= 8:
                         self.clear_total_coeff(block)
-                elif mode == 2:
+                elif mode == 2: # h-split, no residu
                     if block["h"] == 2:
                         raise Exception("cannot h-split block further")
                     frame_blocks = [{
@@ -393,10 +562,18 @@ class ActImagine:
                     }] + frame_blocks
                     if block["w"] >= 8 and block["h"] >= 8:
                         self.clear_total_coeff(block)
-                elif mode == 22:
+                elif mode == 9: # no delta, no residu, ref 1
+                    self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
+                    if block["w"] >= 8 and block["h"] >= 8:
+                        self.clear_total_coeff(block)
+                elif mode == 14: # no delta, no residu, ref 2
+                    self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[2])
+                    if block["w"] >= 8 and block["h"] >= 8:
+                        self.clear_total_coeff(block)
+                elif mode == 22: # predict notile, residu
                     self.predict_notile(reader, block)
                     self.decode_residu_blocks(reader, block)
-                elif mode > 23:
+                elif mode > 23: 
                     raise Exception("frame block mode " + str(mode) + " is greater than 23")
                 else:
                     raise Exception("unimplemented frame block mode " + str(mode))
@@ -410,12 +587,9 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
     
-    
-    #print(vlc.run7_vlc.bit_strings)
-    """
     actimagine = ActImagine()
     actimagine.load_vx(args.filename)
-    actimagine.interpret_vx()"""
+    actimagine.interpret_vx()
 
 if __name__ == "__main__":
     main()
