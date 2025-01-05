@@ -32,14 +32,12 @@ class BitsReader:
 
     def int(self, length, bitorder="little", signed=False):
         bits = self.bits(length)
-        print("int bits: " + str(bits))
         if bitorder == "big":
             bits = reversed(bits)
         
         out = 0
         for bit in bits:
             out = out*2 + bit
-        print("int out : " + str(out))
         return out
 
     def unsigned_expgolomb(self):

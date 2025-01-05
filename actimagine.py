@@ -297,7 +297,7 @@ class ActImagine:
         for y in range(0, block["h"], 8):
             for x in range(0, block["w"], 8):
                 residu_mask_tab_index = reader.unsigned_expgolomb()
-                if residu_mask_tab_index > 31:
+                if residu_mask_tab_index > 0x1F:
                     raise Exception("invalid residu mask tab index " + str(residu_mask_tab_index))
                 residu_mask = ff_actimagine_vx_residu_mask_new_tab[residu_mask_tab_index]
                 print("residu block (" + str(x) + ", " + str(y) + ") mask " + "{:05b}".format(residu_mask))
@@ -307,6 +307,7 @@ class ActImagine:
                     coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x    , block["y"]+y  -1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x  , block["y"]+y  , nc, "y")
+                    print("out_total_coeff bit0: " + str(out_total_coeff))
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y  , out_total_coeff)
                 else:
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y  , 0)
@@ -316,6 +317,7 @@ class ActImagine:
                     coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x+4  , block["y"]+y  -1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x+4, block["y"]+y  , nc, "y")
+                    print("out_total_coeff bit1: " + str(out_total_coeff))
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y  , out_total_coeff)
                 else:
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y  , 0)
@@ -325,6 +327,7 @@ class ActImagine:
                     coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x    , block["y"]+y+4-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x  , block["y"]+y+4, nc, "y")
+                    print("out_total_coeff bit2: " + str(out_total_coeff))
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y+4, out_total_coeff)
                 else:
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x  , block["y"]+y+4, 0)
@@ -334,6 +337,7 @@ class ActImagine:
                     coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "y", block["x"]+x+4  , block["y"]+y+4-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x+4, block["y"]+y+4, nc, "y")
+                    print("out_total_coeff bit3: " + str(out_total_coeff))
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y+4, out_total_coeff)
                 else:
                     self.frame_coeff_setter(self.frame_coeffs, "y", block["x"]+x+4, block["y"]+y+4, 0)
@@ -345,12 +349,14 @@ class ActImagine:
                     out_total_coeff_u = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "u")
                     out_total_coeff_v = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "v")
                     out_total_coeff = int((out_total_coeff_u + out_total_coeff_v + 1) // 2)
+                    print("out_total_coeff bit4: " + str(out_total_coeff))
                     self.frame_coeff_setter(self.frame_coeffs, "uv", block["x"]+x, block["y"]+y, out_total_coeff)
                 else:
                     self.frame_coeff_setter(self.frame_coeffs, "uv", block["x"]+x, block["y"]+y, 0)
 
     def decode_residu_cavlc(self, reader, x, y, nc, plane):
         coeff_token = reader.vlc2(vlc.coeff_token_vlc[ff_h264_cavlc_coeff_token_table_index[nc]])
+        print("coeff_token: " + str(coeff_token))
         if coeff_token == -1:
             raise Exception("invalid vlc")
         
@@ -365,6 +371,7 @@ class ActImagine:
             zeros_left = 0
         else:
             zeros_left = reader.vlc2(vlc.total_zeros_vlc[total_coeff])
+            print("zeros_left: " + str(zeros_left))
             for i in range(16 - (total_coeff + zeros_left)):
                 level.insert(0, 0)
         
@@ -410,6 +417,8 @@ class ActImagine:
         for i in range(zeros_left):
             level.insert(0, 0)
         
+        print(level)
+
         self.decode_dct(reader, x, y, plane, level)
         return out_total_coeff
 
@@ -470,6 +479,63 @@ class ActImagine:
                 self.frame_coeff_setter(self.frame_coeffs, "uv", block["x"]+x, block["y"]+y, 0)
 
 
+    def decode_mb(self, reader, block, pred_vec):
+        mode = reader.unsigned_expgolomb()
+        print(mode)
+        if mode == 0: # v-split, no residu
+            if block["w"] == 2:
+                raise Exception("cannot v-split block further")
+            self.decode_mb(reader, {
+                "x": block["x"],
+                "y": block["y"],
+                "w": block["w"]//2,
+                "h": block["h"]
+            }, pred_vec)
+            self.decode_mb(reader, {
+                "x": block["x"] + block["w"]//2,
+                "y": block["y"],
+                "w": block["w"]//2,
+                "h": block["h"]
+            }, pred_vec)
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 1: # no delta, no residu, ref 0
+            self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[0])
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 2: # h-split, no residu
+            if block["h"] == 2:
+                raise Exception("cannot h-split block further")
+            self.decode_mb(reader, {
+                "x": block["x"],
+                "y": block["y"],
+                "w": block["w"],
+                "h": block["h"]//2
+            }, pred_vec)
+            self.decode_mb(reader, {
+                "x": block["x"],
+                "y": block["y"] + block["h"]//2,
+                "w": block["w"],
+                "h": block["h"]//2
+            }, pred_vec)
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 9: # no delta, no residu, ref 1
+            self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 14: # no delta, no residu, ref 2
+            self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[2])
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 22: # predict notile, residu
+            self.predict_notile(reader, block)
+            self.decode_residu_blocks(reader, block)
+        elif mode > 23: 
+            raise Exception("frame block mode " + str(mode) + " is greater than 23")
+        else:
+            raise Exception("unimplemented frame block mode " + str(mode))
+
     # generate images and audio from vx data
     def interpret_vx(self):
         self.ref_frame_images = [None, None, None]
@@ -488,16 +554,6 @@ class ActImagine:
         }
         
         for frame_object in self.frames:
-            frame_blocks = []
-            for y in range(0, self.frame_height, 16):
-                for x in range(0, self.frame_width, 16):
-                    frame_blocks.append({
-                        "x": x,
-                        "y": y,
-                        "w": 16,
-                        "h": 16
-                    })
-            
             self.frame_image = {
                 "y": np.zeros((self.frame_height, self.frame_width)),
                 "u": np.zeros((self.frame_height // 2, self.frame_width // 2)),
@@ -507,78 +563,32 @@ class ActImagine:
             # read bits from little endian uint16 list from msb to lsb
             reader = read.BitsReader(np.unpackbits([byte for i in range(0, len(frame_object["data"])-1, 2) for byte in reversed(frame_object["data"][i:i+2])]), 0)
             
-            while len(frame_blocks) > 0:
-                block = frame_blocks.pop(0)
-                
-                self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 1] = {"x": 0, "y": 0}
-                pred_vec = {
-                    "x": mid_pred(
-                        self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 0]["x"],
-                        self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 1]["x"],
-                        self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 2]["x"]
-                    ),
-                    "y": mid_pred(
-                        self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 0]["y"],
-                        self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 1]["y"],
-                        self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 2]["y"]
-                    ),
-                }
-                
-                mode = reader.unsigned_expgolomb()
-                print(mode)
-                if mode == 0: # v-split, no residu
-                    if block["w"] == 2:
-                        raise Exception("cannot v-split block further")
-                    frame_blocks = [{
-                        "x": block["x"],
-                        "y": block["y"],
-                        "w": block["w"]//2,
-                        "h": block["h"]
-                    }, {
-                        "x": block["x"] + block["w"]//2,
-                        "y": block["y"],
-                        "w": block["w"]//2,
-                        "h": block["h"]
-                    }] + frame_blocks
-                    if block["w"] >= 8 and block["h"] >= 8:
-                        self.clear_total_coeff(block)
-                elif mode == 1: # no delta, no residu, ref 0
-                    self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[0])
-                    if block["w"] >= 8 and block["h"] >= 8:
-                        self.clear_total_coeff(block)
-                elif mode == 2: # h-split, no residu
-                    if block["h"] == 2:
-                        raise Exception("cannot h-split block further")
-                    frame_blocks = [{
-                        "x": block["x"],
-                        "y": block["y"],
-                        "w": block["w"],
-                        "h": block["h"]//2
-                    }, {
-                        "x": block["x"],
-                        "y": block["y"] + block["h"]//2,
-                        "w": block["w"],
-                        "h": block["h"]//2
-                    }] + frame_blocks
-                    if block["w"] >= 8 and block["h"] >= 8:
-                        self.clear_total_coeff(block)
-                elif mode == 9: # no delta, no residu, ref 1
-                    self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
-                    if block["w"] >= 8 and block["h"] >= 8:
-                        self.clear_total_coeff(block)
-                elif mode == 14: # no delta, no residu, ref 2
-                    self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[2])
-                    if block["w"] >= 8 and block["h"] >= 8:
-                        self.clear_total_coeff(block)
-                elif mode == 22: # predict notile, residu
-                    self.predict_notile(reader, block)
-                    self.decode_residu_blocks(reader, block)
-                elif mode > 23: 
-                    raise Exception("frame block mode " + str(mode) + " is greater than 23")
-                else:
-                    raise Exception("unimplemented frame block mode " + str(mode))
+            for y in range(0, self.frame_height, 16):
+                for x in range(0, self.frame_width, 16):
+                    block = {
+                        "x": x,
+                        "y": y,
+                        "w": 16,
+                        "h": 16
+                    }
+
+                    self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 1] = {"x": 0, "y": 0}
+                    pred_vec = {
+                        "x": mid_pred(
+                            self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 0]["x"],
+                            self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 1]["x"],
+                            self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 2]["x"]
+                        ),
+                        "y": mid_pred(
+                            self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 0]["y"],
+                            self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 1]["y"],
+                            self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 2]["y"]
+                        ),
+                    }
+                    
+                    self.decode_mb(reader, block, pred_vec)
             
-            self.ref_frame_images = [frame_image] + self.ref_frame_images[:-1]
+            self.ref_frame_images = [self.frame_image] + self.ref_frame_images[:-1]
 
 
 
