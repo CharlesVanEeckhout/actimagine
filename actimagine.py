@@ -5,6 +5,7 @@ import numpy as np
 
 import read
 import vlc
+import h264pred
 
 
 ff_actimagine_vx_residu_mask_new_tab = [
@@ -78,6 +79,38 @@ def mid_pred(a, b, c):
 def av_clip_pixel(x):
     return mid_pred(0, x, 255)
 
+def block_half_left(block):
+    return {
+        "x": block["x"],
+        "y": block["y"],
+        "w": block["w"]//2,
+        "h": block["h"]
+    }
+
+def block_half_right(block):
+    return {
+        "x": block["x"] + block["w"]//2,
+        "y": block["y"],
+        "w": block["w"]//2,
+        "h": block["h"]
+    }
+
+def block_half_up(block):
+    return {
+        "x": block["x"],
+        "y": block["y"],
+        "w": block["w"],
+        "h": block["h"]//2
+    }
+
+def block_half_down(block):
+    return {
+        "x": block["x"],
+        "y": block["y"] + block["h"]//2,
+        "w": block["w"],
+        "h": block["h"]//2
+    }
+
 
 class ActImagine:
     def __init__(self):
@@ -96,13 +129,16 @@ class ActImagine:
         self.frame_width = reader.int(4)
         self.frame_height = reader.int(4)
         self.frame_rate = reader.int(4) / 0x10000
-        self.quantiser = reader.int(4)
+        self.quantizer = reader.int(4)
         self.audio_sample_rate = reader.int(4)
         self.audio_streams_qty = reader.int(4)
         self.frame_size_max = reader.int(4)
         self.audio_extradata_offset = reader.int(4)
         self.seek_table_offset = reader.int(4)
         self.seek_table_entries_qty = reader.int(4)
+
+        if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
+            raise Exception("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
 
 
         self.audio_extradata = {}
@@ -137,10 +173,10 @@ class ActImagine:
         
         
         self.qtab = []
-        if self.quantiser < 12 or self.quantiser > 161:
-            raise Exception("quantiser " + str(self.quantiser) + " was out of bounds")
-        qx = self.quantiser % 6
-        qy = self.quantiser // 6
+        if self.quantizer < 12 or self.quantizer > 161:
+            raise Exception("quantizer " + str(self.quantizer) + " was out of bounds")
+        qx = self.quantizer % 6
+        qy = self.quantizer // 6
         
         for i in range(2):
             self.qtab.append([])
@@ -228,15 +264,15 @@ class ActImagine:
         mode = reader.unsigned_expgolomb()
         print("predict notile " + str(mode))
         if mode == 0:
-            raise Exception("unimplemented predict notile uv mode " + str(mode)) # predict_vertical(avctx, x, y, w, h, 0)
+            self.predict_vertical(block, "y")
         elif mode == 1:
-            raise Exception("unimplemented predict notile uv mode " + str(mode)) # predict_horizontal(avctx, x, y, w, h, 0)
+            self.predict_horizontal(block, "y")
         elif mode == 2:
             self.predict_dc(reader, block, "y")
         elif mode == 3:
-            raise Exception("unimplemented predict notile uv mode " + str(mode)) # predict_plane(avctx, x, y, w, h, 0, 0)
+            self.predict_plane(block, "y", 0)
         else:
-            raise Exception("invalid predict notile uv mode " + str(mode))
+            raise Exception("invalid predict notile mode " + str(mode))
         self.predict_notile_uv(reader, block)
 
     def predict_notile_uv(self, reader, block):
@@ -246,14 +282,68 @@ class ActImagine:
             self.predict_dc(reader, block, "u")
             self.predict_dc(reader, block, "v")
         elif mode == 1:
-            raise Exception("unimplemented predict notile uv mode " + str(mode)) # predict_horizontal(avctx, x, y, w, h, 0)
+            self.predict_horizontal(block, "u")
+            self.predict_horizontal(block, "v")
         elif mode == 2:
-            raise Exception("unimplemented predict notile uv mode " + str(mode)) # predict_vertical(avctx, x, y, w, h, 0)
+            self.predict_vertical(block, "u")
+            self.predict_vertical(block, "v")
         elif mode == 3:
-            raise Exception("unimplemented predict notile uv mode " + str(mode)) # predict_plane(avctx, x, y, w, h, 0, 0)
+            self.predict_plane(block, "u", 0)
+            self.predict_plane(block, "v", 0)
         else:
             raise Exception("invalid predict notile uv mode " + str(mode))
 
+
+    def predict4(self, reader, block):
+        for y2 in range(block["h"] // 4):
+            for x2 in range(block["w"] // 4):
+                mode = min(self.pred4_cache[1 + y2 - 1][1 + x2], self.pred4_cache[1 + y2][1 + x2 - 1])
+                if mode == 9:
+                    mode = 2
+                
+                if reader.bit() == 0:
+                    val = reader.bits(3)
+                    mode = val + (val >= mode)*1
+                
+                self.pred4_cache[1 + y2][1 + x2] = mode
+                
+                dst = {
+                    "x": block["x"] + x2*4,
+                    "y": block["y"] + y2*4
+                }
+                
+                if mode == 0: # vertical
+                    h264pred.pred4x4_vertical(self.frame_image["y"], dst)
+                elif mode == 1: # horizontal
+                    h264pred.pred4x4_horizontal(self.frame_image["y"], dst)
+                elif mode == 2: # dc
+                    if dst["x"] == 0 and dst["y"] == 0:
+                        h264pred.pred4x4_128_dc(self.frame_image["y"], dst)
+                    elif dst["x"] == 0 and dst["y"] != 0:
+                        h264pred.pred4x4_top_dc(self.frame_image["y"], dst)
+                    elif dst["x"] != 0 and dst["y"] == 0:
+                        h264pred.pred4x4_left_dc(self.frame_image["y"], dst)
+                    else:
+                        h264pred.pred4x4_dc(self.frame_image["y"], dst)
+                elif mode == 3: # diagonal-down-left
+                    h264pred.pred4x4_down_left(self.frame_image["y"], dst)
+                elif mode == 4: # diagonal-down-right
+                    h264pred.pred4x4_down_right(self.frame_image["y"], dst)
+                elif mode == 5: # vertical-right
+                    h264pred.pred4x4_vertical_right(self.frame_image["y"], dst)
+                elif mode == 6: # horizontal-down
+                    h264pred.pred4x4_horizontal_down(self.frame_image["y"], dst)
+                elif mode == 7: # vertical-left
+                    h264pred.pred4x4_vertical_left(self.frame_image["y"], dst)
+                elif mode == 8: # horizontal-up
+                    h264pred.pred4x4_horizontal_up(self.frame_image["y"], dst)
+                else:
+                    raise Exception("invalid predict4 mode " + str(mode))
+        
+        raise Exception("unimplemented method predict4")
+        self.frame_image_iterator(block, "-", predict4_callback)
+        
+        self.predict_plane(reader, block)
 
 
     def predict_dc(self, reader, block, plane):
@@ -290,6 +380,92 @@ class ActImagine:
             self.frame_image_setter(self.frame_image, plane, x, y, dc)
         
         self.frame_image_iterator(block, plane, predict_dc_callback)
+
+    def predict_horizontal(self, block, plane):
+        def predict_horizontal_callback(x, y, plane, **kwargs):
+            # get pixel from the left border of current block
+            pixel = self.frame_image_getter(self.frame_image, plane, block["x"]-1, y)
+            self.frame_image_setter(self.frame_image, plane, x, y, pixel)
+        
+        self.frame_image_iterator(block, plane, predict_horizontal_callback)
+
+    def predict_vertical(self, block, plane):
+        def predict_vertical_callback(x, y, plane, **kwargs):
+            # get pixel from the top border of current block
+            pixel = self.frame_image_getter(self.frame_image, plane, x, block["y"]-1)
+            self.frame_image_setter(self.frame_image, plane, x, y, pixel)
+        
+        self.frame_image_iterator(block, plane, predict_vertical_callback)
+
+    def predict_plane(self, block, plane, param):
+        bottom_left = self.frame_image_getter(self.frame_image, plane, block["x"]-1, block["y"]+block["h"]-1)
+        top_right = self.frame_image_getter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]-1)
+        pixel = (bottom_left + top_right + 1) // 2 + param
+        self.frame_image_setter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1, pixel)
+        
+        def predict_plane_intern(block, plane):
+            step = 2
+            if plane == "y":
+                step = 1
+            
+            if block["w"] == step and block["h"] == step:
+                return
+            elif block["w"] == step and block["h"] > step:
+                top = self.frame_image_getter(self.frame_image, plane, block["x"], block["y"]-1)
+                bottom = self.frame_image_getter(self.frame_image, plane, block["x"], block["y"]+block["h"]-1)
+                pixel = (top + bottom) // 2
+                self.frame_image_setter(self.frame_image, plane, block["x"], block["y"]+(block["h"]//2)-1, pixel)
+                predict_plane_intern(block_half_up(block), plane)
+                predict_plane_intern(block_half_down(block), plane)
+            elif block["w"] > step and block["h"] == step:
+                left = self.frame_image_getter(self.frame_image, plane, block["x"]-1, block["y"])
+                right = self.frame_image_getter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"])
+                pixel = (left + right) // 2
+                self.frame_image_setter(self.frame_image, plane, block["x"]+(block["w"]//2)-1, block["y"], pixel)
+                predict_plane_intern(block_half_left(block), plane)
+                predict_plane_intern(block_half_right(block), plane)
+            else:
+                bottom_left = self.frame_image_getter(self.frame_image, plane, block["x"]-1, block["y"]+block["h"]-1)
+                top_right = self.frame_image_getter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]-1)
+                bottom_right = self.frame_image_getter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1)
+                bottom_center = (bottom_left + bottom_right) // 2
+                center_right = (top_right + bottom_right) // 2
+                self.frame_image_setter(self.frame_image, plane, block["x"]+(block["w"]//2)-1, block["y"]+block["h"]-1, bottom_center)
+                self.frame_image_setter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]+(block["h"]//2)-1, center_right)
+                if (block["w"] == 4*step or block["w"] == 16*step) is not (block["h"] == 4*step or block["h"] == 16*step):
+                    center_left = self.frame_image_getter(self.frame_image, plane, block["x"]-1, block["y"]+(block["h"]//2)-1)
+                    pixel = (center_left + center_right) // 2
+                else:
+                    top_center = self.frame_image_getter(self.frame_image, plane, block["x"]+(block["w"]//2)-1, block["y"]-1)
+                    pixel = (top_center + bottom_center) // 2
+                self.frame_image_setter(self.frame_image, plane, block["x"]+(block["w"]//2)-1, block["y"]+(block["h"]//2)-1, pixel)
+                predict_plane_intern(block_half_up(block_half_left(block)), plane)
+                predict_plane_intern(block_half_up(block_half_right(block)), plane)
+                predict_plane_intern(block_half_down(block_half_left(block)), plane)
+                predict_plane_intern(block_half_down(block_half_right(block)), plane)
+        
+        predict_plane_intern(block, plane)
+
+
+    def predict_mb_plane(self, reader, block):
+        # y
+        param = reader.signed_expgolomb()
+        if param < -(1 << 16) or param >= (1 << 16):
+            raise Exception("invalid plane param " + str(param))
+        self.predict_plane(block, "y", param)
+        
+        # u
+        param = reader.signed_expgolomb()
+        if param < -(1 << 16) or param >= (1 << 16):
+            raise Exception("invalid plane param " + str(param))
+        self.predict_plane(block, "u", param)
+        
+        # v
+        param = reader.signed_expgolomb()
+        if param < -(1 << 16) or param >= (1 << 16):
+            raise Exception("invalid plane param " + str(param))
+        self.predict_plane(block, "v", param)
+
 
 
     def decode_residu_blocks(self, reader, block):
@@ -485,18 +661,8 @@ class ActImagine:
         if mode == 0: # v-split, no residu
             if block["w"] == 2:
                 raise Exception("cannot v-split block further")
-            self.decode_mb(reader, {
-                "x": block["x"],
-                "y": block["y"],
-                "w": block["w"]//2,
-                "h": block["h"]
-            }, pred_vec)
-            self.decode_mb(reader, {
-                "x": block["x"] + block["w"]//2,
-                "y": block["y"],
-                "w": block["w"]//2,
-                "h": block["h"]
-            }, pred_vec)
+            self.decode_mb(reader, block_half_left(block), pred_vec)
+            self.decode_mb(reader, block_half_right(block), pred_vec)
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
         elif mode == 1: # no delta, no residu, ref 0
@@ -506,24 +672,20 @@ class ActImagine:
         elif mode == 2: # h-split, no residu
             if block["h"] == 2:
                 raise Exception("cannot h-split block further")
-            self.decode_mb(reader, {
-                "x": block["x"],
-                "y": block["y"],
-                "w": block["w"],
-                "h": block["h"]//2
-            }, pred_vec)
-            self.decode_mb(reader, {
-                "x": block["x"],
-                "y": block["y"] + block["h"]//2,
-                "w": block["w"],
-                "h": block["h"]//2
-            }, pred_vec)
+            self.decode_mb(reader, block_half_up(block), pred_vec)
+            self.decode_mb(reader, block_half_down(block), pred_vec)
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
+        elif mode == 7: # plane, no residu
+            self.predict_mb_plane(reader, block)
+            self.clear_total_coeff(block)
         elif mode == 9: # no delta, no residu, ref 1
             self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
+        elif mode == 11: # predict notile, no residu
+            self.predict_notile(reader, block)
+            self.clear_total_coeff(block)
         elif mode == 14: # no delta, no residu, ref 2
             self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[2])
             if block["w"] >= 8 and block["h"] >= 8:
@@ -536,8 +698,15 @@ class ActImagine:
         else:
             raise Exception("unimplemented frame block mode " + str(mode))
 
+
     # generate images and audio from vx data
     def interpret_vx(self):
+        self.pred4_cache = []
+        for i in range(5):
+            self.pred4_cache.append([])
+            for j in range(5):
+                self.pred4_cache[i].append(9)
+        
         self.ref_frame_images = [None, None, None]
         
         self.vectors = []
