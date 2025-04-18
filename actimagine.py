@@ -2,10 +2,12 @@
 
 import argparse
 import numpy as np
+import PIL
 
 import read
 import vlc
 import h264pred
+import frameconv
 
 
 ff_actimagine_vx_residu_mask_new_tab = [
@@ -302,7 +304,7 @@ class ActImagine:
                     mode = 2
                 
                 if reader.bit() == 0:
-                    val = reader.bits(3)
+                    val = reader.int(3)
                     mode = val + (val >= mode)*1
                 
                 self.pred4_cache[1 + y2][1 + x2] = mode
@@ -340,10 +342,7 @@ class ActImagine:
                 else:
                     raise Exception("invalid predict4 mode " + str(mode))
         
-        raise Exception("unimplemented method predict4")
-        self.frame_image_iterator(block, "-", predict4_callback)
-        
-        self.predict_plane(reader, block)
+        self.predict_notile_uv(reader, block)
 
 
     def predict_dc(self, reader, block, plane):
@@ -663,7 +662,7 @@ class ActImagine:
                 raise Exception("cannot v-split block further")
             self.decode_mb(reader, block_half_left(block), pred_vec)
             self.decode_mb(reader, block_half_right(block), pred_vec)
-            if block["w"] >= 8 and block["h"] >= 8:
+            if block["w"] == 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
         elif mode == 1: # no delta, no residu, ref 0
             self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[0])
@@ -674,24 +673,48 @@ class ActImagine:
                 raise Exception("cannot h-split block further")
             self.decode_mb(reader, block_half_up(block), pred_vec)
             self.decode_mb(reader, block_half_down(block), pred_vec)
-            if block["w"] >= 8 and block["h"] >= 8:
+            if block["w"] >= 8 and block["h"] == 8:
                 self.clear_total_coeff(block)
         elif mode == 7: # plane, no residu
             self.predict_mb_plane(reader, block)
-            self.clear_total_coeff(block)
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 8: # v-split, residu
+            if block["w"] == 2:
+                raise Exception("cannot v-split block further")
+            self.decode_mb(reader, block_half_left(block), pred_vec)
+            self.decode_mb(reader, block_half_right(block), pred_vec)
+            self.decode_residu_blocks(reader, block)
         elif mode == 9: # no delta, no residu, ref 1
             self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
         elif mode == 11: # predict notile, no residu
             self.predict_notile(reader, block)
-            self.clear_total_coeff(block)
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 13: # h-split, residu
+            if block["h"] == 2:
+                raise Exception("cannot h-split block further")
+            self.decode_mb(reader, block_half_up(block), pred_vec)
+            self.decode_mb(reader, block_half_down(block), pred_vec)
+            self.decode_residu_blocks(reader, block)
         elif mode == 14: # no delta, no residu, ref 2
             self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[2])
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
+        elif mode == 15: # predict4, no residu
+            self.predict4(reader, block)
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 19: # predict4, residu
+            self.predict4(reader, block)
+            self.decode_residu_blocks(reader, block)
         elif mode == 22: # predict notile, residu
             self.predict_notile(reader, block)
+            self.decode_residu_blocks(reader, block)
+        elif mode == 23: # plane, residu
+            self.predict_mb_plane(reader, block)
             self.decode_residu_blocks(reader, block)
         elif mode > 23: 
             raise Exception("frame block mode " + str(mode) + " is greater than 23")
@@ -712,10 +735,8 @@ class ActImagine:
         self.vectors = []
         for y in range((self.frame_height // 16) + 1):
             self.vectors.append([])
-            for x in range((self.frame_height // 16) + 2):
+            for x in range((self.frame_width // 16) + 2):
                 self.vectors[y].append({"x": 0, "y": 0})
-        #vectors_stride = (self.frame_height // 16) + 2
-        #vectors_size = ((self.frame_height // 16) + 1) * vectors_stride
         
         self.frame_coeffs = {
             "y": np.zeros((self.frame_height // 4 + 1, self.frame_width // 4 + 1)),
@@ -758,6 +779,9 @@ class ActImagine:
                     self.decode_mb(reader, block, pred_vec)
             
             self.ref_frame_images = [self.frame_image] + self.ref_frame_images[:-1]
+            test_image = frameconv.convert_frame_to_image(self.frame_image)
+            test_image.save("frame0001.png")
+            raise Exception("frame completed successfully")
 
 
 
