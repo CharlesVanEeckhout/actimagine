@@ -399,7 +399,11 @@ class ActImagine:
     def predict_plane(self, block, plane, param):
         bottom_left = self.frame_image_getter(self.frame_image, plane, block["x"]-1, block["y"]+block["h"]-1)
         top_right = self.frame_image_getter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]-1)
+        print("plane bottom_left: " + str(bottom_left))
+        print("plane top_right: " + str(top_right))
+        print("plane param: " + str(param))
         pixel = (bottom_left + top_right + 1) // 2 + param
+        print("plane px: " + str(pixel))
         self.frame_image_setter(self.frame_image, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1, pixel)
         
         def predict_plane_intern(block, plane):
@@ -451,19 +455,22 @@ class ActImagine:
         param = reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
             raise Exception("invalid plane param " + str(param))
-        self.predict_plane(block, "y", param)
+        print("mbplane y param: " + str(param))
+        self.predict_plane(block, "y", param * 2)
         
         # u
         param = reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
             raise Exception("invalid plane param " + str(param))
-        self.predict_plane(block, "u", param)
+        print("mbplane u param: " + str(param))
+        self.predict_plane(block, "u", param * 2)
         
         # v
         param = reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
             raise Exception("invalid plane param " + str(param))
-        self.predict_plane(block, "v", param)
+        print("mbplane v param: " + str(param))
+        self.predict_plane(block, "v", param * 2)
 
 
 
@@ -554,7 +561,7 @@ class ActImagine:
         while True:
             if trailing_ones > 0:
                 trailing_ones -= 1
-                level.insert(0, [-1, 1][reader.bit()])
+                level.insert(0, [1, -1][reader.bit()])
             else:
                 level_prefix = 0
                 while reader.bit() == 0:

@@ -51,8 +51,8 @@ class BitsReader:
         return int(bit_string, 2) - 1
 
     def signed_expgolomb(self):
-        ug = self.unsigned_expgolomb()
-        if ug & 2 == 0:
+        ug = self.unsigned_expgolomb() + 1
+        if ug & 1 == 0:
             return ug // 2
         else:
             return -(ug // 2)
