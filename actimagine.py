@@ -186,13 +186,13 @@ class ActImagine:
                 self.qtab[i].append(quant4x4_tab[qx][4 * i + j] << qy)
         
         
-        self.frames = []
+        self.frame_objects = []
         for i in range(self.frames_qty):
             frame_object = {}
             frame_object["size"] = reader.int(2)
             frame_object["audio_frames_qty"] = reader.int(2)
             frame_object["data"] = np.array(list(reader.bytes(frame_object["size"]-2)), dtype=np.ubyte)
-            self.frames.append(frame_object)
+            self.frame_objects.append(frame_object)
 
 
     def frame_image_getter(self, frame_image, plane, x, y):
@@ -232,34 +232,52 @@ class ActImagine:
             vec["x"] += reader.signed_expgolomb()
             vec["y"] += reader.signed_expgolomb()
         
-        if (
-            block["x"] + vec["x"] < 0 or 
-            block["x"] + block["w"] + vec["x"] > self.frame_width or
-            block["y"] + vec["y"] < 0 or 
-            block["y"] + block["h"] + vec["y"] > self.frame_height
-        ):
+        if block["x"] + vec["x"] < 0 or block["x"] + vec["x"] + block["w"] > self.frame_width or \
+            block["y"] + vec["y"] < 0 or block["y"] + vec["y"] + block["h"] > self.frame_height:
             raise Exception("motion vector moves block out of bounds")
         
         self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 1] = vec
         
         def predict_inter_callback(x, y, plane, **kwargs):
             self.frame_image_setter(self.frame_image, plane, x, y, 
-                self.frame_image_getter(self.frame_image, plane, x+vec["x"], y+vec["y"])
+                self.frame_image_getter(ref_frame_image, plane, x+vec["x"], y+vec["y"])
             )
         
         self.frame_image_iterator(block, "yuv", predict_inter_callback)
-        """# luma
-        for y in range(block["y"], block["y"] + block["h"]):
-            for x in range(block["x"], block["x"] + block["w"]):
-                self.frame_image["y"][y][x] = ref_frame_image["y"][y+vec["y"]][x+vec["x"]]
+
+
+    def predict_inter_dc(self, reader, block):
+        vec = {
+            "x": reader.signed_expgolomb(),
+            "y": reader.signed_expgolomb()
+        }
         
-        # chroma (uv is per 2x2 px)
-        for y in range(block["y"], block["y"] + block["h"], 2):
-            for x in range(block["x"], block["x"] + block["w"], 2):
-                # u
-                self.frame_image["u"][y // 2][x // 2] = ref_frame_image["u"][(y+vec["y"]) // 2][(x+vec["x"]) // 2]
-                # v
-                self.frame_image["v"][y // 2][x // 2] = ref_frame_image["v"][(y+vec["y"]) // 2][(x+vec["x"]) // 2]"""
+        if block["x"] + vec["x"] < 0 or block["x"] + vec["x"] + block["w"] > self.frame_width or \
+            block["y"] + vec["y"] < 0 or block["y"] + vec["y"] + block["h"] > self.frame_height:
+            raise Exception("motion vector out of bounds")
+        
+        dc = {}
+        dc["y"] = reader.signed_expgolomb()
+        if dc["y"] < -(1 << 16) or dc["y"] >= (1 << 16):
+            raise Exception("invalid dc offset")
+        dc["y"] *= 2
+        
+        dc["u"] = reader.signed_expgolomb()
+        if dc["u"] < -(1 << 16) or dc["u"] >= (1 << 16):
+            raise Exception("invalid dc offset")
+        dc["u"] *= 2
+        
+        dc["v"] = reader.signed_expgolomb()
+        if dc["v"] < -(1 << 16) or dc["v"] >= (1 << 16):
+            raise Exception("invalid dc offset")
+        dc["v"] *= 2
+        
+        def predict_inter_dc_callback(x, y, plane, **kwargs):
+            self.frame_image_setter(self.frame_image, plane, x, y, 
+                self.frame_image_getter(self.ref_frame_images[0], plane, x+vec["x"], y+vec["y"]) + dc[plane]
+            )
+        
+        self.frame_image_iterator(block, "yuv", predict_inter_dc_callback)
 
 
     def predict_notile(self, reader, block):
@@ -682,6 +700,22 @@ class ActImagine:
             self.decode_mb(reader, block_half_down(block), pred_vec)
             if block["w"] >= 8 and block["h"] == 8:
                 self.clear_total_coeff(block)
+        elif mode == 3: # unpredicted delta ref0 + dc offset, no residu
+            self.predict_inter_dc(reader, block)
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 4: # delta, no residu, ref 0
+            self.predict_inter(reader, block, pred_vec, True, self.ref_frame_images[0])
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 5: # delta, no residu, ref 1
+            self.predict_inter(reader, block, pred_vec, True, self.ref_frame_images[1])
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
+        elif mode == 6: # delta, no residu, ref 2
+            self.predict_inter(reader, block, pred_vec, True, self.ref_frame_images[2])
+            if block["w"] >= 8 and block["h"] >= 8:
+                self.clear_total_coeff(block)
         elif mode == 7: # plane, no residu
             self.predict_mb_plane(reader, block)
             if block["w"] >= 8 and block["h"] >= 8:
@@ -696,10 +730,16 @@ class ActImagine:
             self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
+        elif mode == 10: # unpredicted delta ref0 + dc offset, no residu
+            self.predict_inter_dc(reader, block)
+            self.decode_residu_blocks(reader, block)
         elif mode == 11: # predict notile, no residu
             self.predict_notile(reader, block)
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
+        elif mode == 12: # no delta, residu, ref 0
+            self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[0])
+            self.decode_residu_blocks(reader, block)
         elif mode == 13: # h-split, residu
             if block["h"] == 2:
                 raise Exception("cannot h-split block further")
@@ -714,8 +754,23 @@ class ActImagine:
             self.predict4(reader, block)
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
+        elif mode == 16: # delta, residu, ref 0
+            self.predict_inter(reader, block, pred_vec, True, self.ref_frame_images[0])
+            self.decode_residu_blocks(reader, block)
+        elif mode == 17: # delta, residu, ref 1
+            self.predict_inter(reader, block, pred_vec, True, self.ref_frame_images[1])
+            self.decode_residu_blocks(reader, block)
+        elif mode == 18: # delta, residu, ref 2
+            self.predict_inter(reader, block, pred_vec, True, self.ref_frame_images[2])
+            self.decode_residu_blocks(reader, block)
         elif mode == 19: # predict4, residu
             self.predict4(reader, block)
+            self.decode_residu_blocks(reader, block)
+        elif mode == 20: # no delta, residu, ref 1
+            self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[1])
+            self.decode_residu_blocks(reader, block)
+        elif mode == 21: # no delta, residu, ref 2
+            self.predict_inter(reader, block, pred_vec, False, self.ref_frame_images[2])
             self.decode_residu_blocks(reader, block)
         elif mode == 22: # predict notile, residu
             self.predict_notile(reader, block)
@@ -750,7 +805,8 @@ class ActImagine:
             "uv": np.zeros((self.frame_height // 8 + 1, self.frame_width // 8 + 1)),
         }
         
-        for frame_object in self.frames:
+        frame_number = 1
+        for frame_object in self.frame_objects:
             self.frame_image = {
                 "y": np.zeros((self.frame_height, self.frame_width)),
                 "u": np.zeros((self.frame_height // 2, self.frame_width // 2)),
@@ -759,6 +815,8 @@ class ActImagine:
             
             # read bits from little endian uint16 list from msb to lsb
             reader = read.BitsReader(np.unpackbits([byte for i in range(0, len(frame_object["data"])-1, 2) for byte in reversed(frame_object["data"][i:i+2])]), 0)
+            
+            print("start frame")
             
             for y in range(0, self.frame_height, 16):
                 for x in range(0, self.frame_width, 16):
@@ -787,8 +845,8 @@ class ActImagine:
             
             self.ref_frame_images = [self.frame_image] + self.ref_frame_images[:-1]
             test_image = frameconv.convert_frame_to_image(self.frame_image)
-            test_image.save("frame0001.png")
-            raise Exception("frame completed successfully")
+            test_image.save("frame{:04d}.png".format(frame_number))
+            frame_number += 1
 
 
 
