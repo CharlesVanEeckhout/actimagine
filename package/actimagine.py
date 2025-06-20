@@ -1,13 +1,12 @@
 # code adapted from https://lists.ffmpeg.org/pipermail/ffmpeg-devel/2021-March/277989.html
 
-import argparse
 import numpy as np
 import PIL
 
-import read
-import vlc
-import h264pred
-import frameconv
+from . import read
+from . import vlc
+from . import h264pred
+from . import frameconv
 
 
 ff_actimagine_vx_residu_mask_new_tab = [
@@ -119,10 +118,7 @@ class ActImagine:
         pass
 
 
-    def load_vx(self, filename):
-        with open(filename, "rb") as f:
-            data = f.read()
-
+    def load_vx(self, data):
         reader = read.DataReader(data, 0)
 
 
@@ -884,18 +880,4 @@ class ActImagine:
             test_image = frameconv.convert_frame_to_image(self.frame_image)
             test_image.save("frame{:04d}.png".format(self.frame_number))
             self.frame_number += 1
-
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('filename')
-    args = parser.parse_args()
-    
-    actimagine = ActImagine()
-    actimagine.load_vx(args.filename)
-    actimagine.interpret_vx()
-
-if __name__ == "__main__":
-    main()
 

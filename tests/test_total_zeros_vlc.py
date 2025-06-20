@@ -1,7 +1,7 @@
 import sys
 sys.path.append('..')
 
-import vlc
+from package import vlc
 from vlc_test import vlc_test
 
 

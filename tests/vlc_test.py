@@ -1,7 +1,7 @@
 import sys
 sys.path.append('..')
 
-import read
+from package import read
 
 
 def vlc_test(expected_results, tested_vlc):
