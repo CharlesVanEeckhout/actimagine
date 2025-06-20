@@ -217,10 +217,16 @@ class ActImagine:
                     callback(x, y, plane, **kwargs)
 
     def frame_coeff_getter(self, frame_coeff, plane, x, y):
-        return self.frame_image_getter(frame_coeff, plane, x // 4 + 1, y // 4 + 1)
+        step = 2
+        if plane == "y":
+            step = 1
+        return self.frame_image_getter(frame_coeff, plane, x // 4 + step, y // 4 + step)
         
     def frame_coeff_setter(self, frame_coeff, plane, x, y, value):
-        self.frame_image_setter(frame_coeff, plane, x // 4 + 1, y // 4 + 1, value)
+        step = 2
+        if plane == "y":
+            step = 1
+        self.frame_image_setter(frame_coeff, plane, x // 4 + step, y // 4 + step, value)
 
 
     def predict_inter(self, reader, block, pred_vec, has_delta, ref_frame_image):
@@ -274,7 +280,7 @@ class ActImagine:
         
         def predict_inter_dc_callback(x, y, plane, **kwargs):
             self.frame_image_setter(self.frame_image, plane, x, y, 
-                self.frame_image_getter(self.ref_frame_images[0], plane, x+vec["x"], y+vec["y"]) + dc[plane]
+                av_clip_pixel(self.frame_image_getter(self.ref_frame_images[0], plane, x+vec["x"], y+vec["y"]) + dc[plane])
             )
         
         self.frame_image_iterator(block, "yuv", predict_inter_dc_callback)
@@ -375,7 +381,7 @@ class ActImagine:
             for y in range(block["h"]):
                 sum_y += self.frame_image_getter(self.frame_image, plane, block["x"]-1, block["y"]+y)
             
-            dc = ((sum_x // block["w"]) + (sum_y // block["h"])) // 2
+            dc = ((sum_x // block["w"]) + (sum_y // block["h"]) + 1) // 2
             
         elif block["x"] == 0 and block["y"] != 0:
             # average of pixels on the top border of current block
@@ -546,6 +552,7 @@ class ActImagine:
                     coeff_left = self.frame_coeff_getter(self.frame_coeffs, "uv", block["x"]+x-1, block["y"]+y  )
                     coeff_top  = self.frame_coeff_getter(self.frame_coeffs, "uv", block["x"]+x  , block["y"]+y-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
+                    print("nc: " + str(nc))
                     out_total_coeff_u = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "u")
                     out_total_coeff_v = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "v")
                     out_total_coeff = int((out_total_coeff_u + out_total_coeff_v + 1) // 2)
@@ -680,6 +687,11 @@ class ActImagine:
 
 
     def decode_mb(self, reader, block, pred_vec):
+        #if self.frame_number == 22 and block["y"] == 0x50 and block["x"] == 0xB0:
+        #    print("block found start b0")
+        #if self.frame_number == 22 and block["y"] == 0x50 and block["x"] == 0xC0:
+        #    print("block found start")
+        
         mode = reader.unsigned_expgolomb()
         print(mode)
         if mode == 0: # v-split, no residu
@@ -779,9 +791,22 @@ class ActImagine:
             self.predict_mb_plane(reader, block)
             self.decode_residu_blocks(reader, block)
         elif mode > 23: 
+            """for plane in ["y", "u", "v"]:
+                with open("frame{:04d}_{}.bin".format(self.frame_number, plane), "wb") as f:
+                    for row in self.frame_image[plane]:
+                        for pixel in row:
+                            f.write(pixel.astype(np.uint8))
+            for plane in ["y", "uv"]:
+                with open("frame{:04d}_coeff{}.bin".format(self.frame_number, plane), "wb") as f:
+                    for row in self.frame_coeffs[plane]:
+                        for coeff in row:
+                            f.write(coeff.astype(np.uint8))"""
             raise Exception("frame block mode " + str(mode) + " is greater than 23")
         else:
             raise Exception("unimplemented frame block mode " + str(mode))
+        
+        #if self.frame_number == 22 and block["y"] == 0x50 and block["x"] == 0xC0:
+        #    raise Exception("block found end")
 
 
     # generate images and audio from vx data
@@ -805,12 +830,12 @@ class ActImagine:
             "uv": np.zeros((self.frame_height // 8 + 1, self.frame_width // 8 + 1)),
         }
         
-        frame_number = 1
+        self.frame_number = 1
         for frame_object in self.frame_objects:
             self.frame_image = {
-                "y": np.zeros((self.frame_height, self.frame_width)),
-                "u": np.zeros((self.frame_height // 2, self.frame_width // 2)),
-                "v": np.zeros((self.frame_height // 2, self.frame_width // 2))
+                "y": np.zeros((self.frame_height, self.frame_width), dtype=np.uint16),
+                "u": np.zeros((self.frame_height // 2, self.frame_width // 2), dtype=np.uint16),
+                "v": np.zeros((self.frame_height // 2, self.frame_width // 2), dtype=np.uint16)
             }
             
             # read bits from little endian uint16 list from msb to lsb
@@ -843,10 +868,22 @@ class ActImagine:
                     
                     self.decode_mb(reader, block, pred_vec)
             
+            """for plane in ["y", "u", "v"]:
+                with open("frame{:04d}_{}.bin".format(self.frame_number, plane), "wb") as f:
+                    for row in self.frame_image[plane]:
+                        for pixel in row:
+                            f.write(pixel.astype(np.uint8))
+            
+            for plane in ["y", "uv"]:
+                with open("frame{:04d}_coeff{}.bin".format(self.frame_number, plane), "wb") as f:
+                    for row in self.frame_coeffs[plane]:
+                        for coeff in row:
+                            f.write(coeff.astype(np.uint8))"""
+            
             self.ref_frame_images = [self.frame_image] + self.ref_frame_images[:-1]
             test_image = frameconv.convert_frame_to_image(self.frame_image)
-            test_image.save("frame{:04d}.png".format(frame_number))
-            frame_number += 1
+            test_image.save("frame{:04d}.png".format(self.frame_number))
+            self.frame_number += 1
 
 
 
