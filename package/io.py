@@ -1,4 +1,4 @@
-class DataReader:
+class BytesReader:
     def __init__(self, data, offset):
         self.data = data
         self.offset = offset
@@ -33,7 +33,7 @@ class BitsReader:
     def int(self, length, bitorder="little", signed=False):
         bits = self.bits(length)
         if bitorder == "big":
-            bits = reversed(bits)
+            bits.reverse()
         
         out = 0
         for bit in bits:
@@ -66,3 +66,62 @@ class BitsReader:
         if len(out) == 0:
             return -1
         return out[0][0]
+
+
+class BytesWriter:
+    def __init__(self):
+        self.data = np.array([], dtype=np.ubyte)
+
+    def bytes(self, data):
+        self.data += data
+
+    def int(self, value, length, byteorder="little"):
+        self.data += list(value.to_bytes(length, byteorder))
+
+
+class BitsWriter:
+    def __init__(self):
+        self.data = np.array([], dtype=np.ubyte)
+
+    def bit(self, value):
+        self.data.append(value)
+
+    def bits(self, data):
+        self.data += data
+
+    def int(self, value, length, bitorder="little", signed=False):
+        value_max = 1 << length
+        if signed and value < 0:
+            value += value_max
+        if value < 0 or value >= value_max:
+            raise Exception("value is out of bounds")
+        
+        out = []
+        for i in range(length):
+            out.append(value & 1)
+            value = value // 2
+        if bitorder == "little":
+            out.reverse()
+        return out
+
+    def unsigned_expgolomb(self, value):
+        if value < 0:
+            raise Exception("value is out of bounds")
+        value += 1
+        out = f"{value:b}"
+        out = "0" * len(out - 1) + out
+        return out
+
+    def signed_expgolomb(self, value):
+        value = value * 2
+        if value <= 0:
+            value = 1 - value
+        self.unsigned_expgolomb(value - 1)
+    
+    def vlc2(self, value, vlc):
+        if value < 0 or value >= len(vlc.bit_strings):
+            raise Exception("value is out of bounds")
+        bs = vlc.bit_strings[value]
+        for b in bs:
+            self.bit(int(b))
+

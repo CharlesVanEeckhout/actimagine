@@ -3,8 +3,8 @@
 import numpy as np
 import PIL
 
-from . import frame
-from . import read
+from .frame_decoder import FrameDecoder
+from . import io
 
 
 quant4x4_tab = [
@@ -23,7 +23,7 @@ class ActImagine:
 
 
     def load_vx(self, data):
-        reader = read.DataReader(data, 0)
+        reader = io.BytesReader(data, 0)
 
 
         self.file_signature = reader.bytes(4)
@@ -44,7 +44,7 @@ class ActImagine:
 
 
         self.audio_extradata = {}
-        reader_temp = read.DataReader(data, self.audio_extradata_offset)
+        reader_temp = io.BytesReader(data, self.audio_extradata_offset)
 
         self.audio_extradata["lpc_codebooks"] = []
         for i in range(3):
@@ -66,7 +66,7 @@ class ActImagine:
 
 
         self.seek_table = []
-        reader_temp = read.DataReader(data, self.seek_table_offset)
+        reader_temp = io.BytesReader(data, self.seek_table_offset)
         for i in range(self.seek_table_entries_qty):
             self.seek_table.append({
                 "frame_id": reader_temp.int(4),
@@ -89,7 +89,7 @@ class ActImagine:
         self.frame_objects = []
         ref_frame_objects = [None, None, None]
         for i in range(self.frames_qty):
-            frame_object = frame.Frame(self.frame_width, self.frame_height, ref_frame_objects, self.qtab)
+            frame_object = FrameDecoder(self.frame_width, self.frame_height, ref_frame_objects, self.qtab)
             frame_data_size = reader.int(2)
             frame_object.audio_frames_qty = reader.int(2)
             frame_object.data = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)

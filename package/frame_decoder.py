@@ -1,79 +1,17 @@
 
 import numpy as np
 
-from . import read
+from . import io
 from . import vlc
 from . import h264pred
-from . import frameconv
-
-
-
-ff_actimagine_vx_residu_mask_new_tab = [
-    0x00, 0x08, 0x04, 0x02, 0x01, 0x1F, 0x0F, 0x0A,
-    0x05, 0x0C, 0x03, 0x10, 0x0E, 0x0D, 0x0B, 0x07,
-    0x09, 0x06, 0x1E, 0x1B, 0x1A, 0x1D, 0x17, 0x15,
-    0x18, 0x12, 0x11, 0x1C, 0x14, 0x13, 0x16, 0x19
-]
-
-ff_h264_cavlc_coeff_token_table_index = [
-    0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3
-]
-
-ff_h264_cavlc_suffix_limit = [
-    0, 3, 6, 12, 24, 48, 0x8000
-]
-
-# ff_zigzag_scan with swapped 2bit
-zigzag_scan = [
-    0*4+0, 1*4+0, 0*4+1, 0*4+2,
-    1*4+1, 2*4+0, 3*4+0, 2*4+1,
-    1*4+2, 0*4+3, 1*4+3, 2*4+2,
-    3*4+1, 3*4+2, 2*4+3, 3*4+3,
-];
+from . import frame_convert
+from .frame_includes import *
 
 
 
 
-def mid_pred(a, b, c):
-    return sorted([a, b, c])[1]
 
-def av_clip_pixel(x):
-    return mid_pred(0, x, 255)
-
-def block_half_left(block):
-    return {
-        "x": block["x"],
-        "y": block["y"],
-        "w": block["w"]//2,
-        "h": block["h"]
-    }
-
-def block_half_right(block):
-    return {
-        "x": block["x"] + block["w"]//2,
-        "y": block["y"],
-        "w": block["w"]//2,
-        "h": block["h"]
-    }
-
-def block_half_up(block):
-    return {
-        "x": block["x"],
-        "y": block["y"],
-        "w": block["w"],
-        "h": block["h"]//2
-    }
-
-def block_half_down(block):
-    return {
-        "x": block["x"],
-        "y": block["y"] + block["h"]//2,
-        "w": block["w"],
-        "h": block["h"]//2
-    }
-
-
-class Frame:
+class FrameDecoder:
     def __init__(self, frame_width, frame_height, ref_frame_objects, qtab):
         self.frame_width = frame_width
         self.frame_height = frame_height
@@ -81,30 +19,6 @@ class Frame:
         self.qtab = qtab
         self.audio_frames_qty = None
         self.data = None
-
-
-    def plane_buffer_getter(self, plane_buffers, plane, x, y):
-        step = 1 if plane == "y" else 2
-        return plane_buffers[plane][y // step][x // step]
-
-    def plane_buffer_setter(self, plane_buffers, plane, x, y, value):
-        step = 1 if plane == "y" else 2
-        plane_buffers[plane][y // step][x // step] = value 
-
-    def plane_buffer_iterator(self, block, planes, callback, **kwargs):
-        for plane in planes:
-            step = 1 if plane == "y" else 2
-            for y in range(block["y"], block["y"] + block["h"], step):
-                for x in range(block["x"], block["x"] + block["w"], step):
-                    callback(x, y, plane, **kwargs)
-
-    def coeff_buffer_getter(self, coeff_buffers, plane, x, y):
-        step = 1 if plane == "y" else 2
-        return self.plane_buffer_getter(coeff_buffers, plane, x // 4 + step, y // 4 + step)
-        
-    def coeff_buffer_setter(self, coeff_buffers, plane, x, y, value):
-        step = 1 if plane == "y" else 2
-        self.plane_buffer_setter(coeff_buffers, plane, x // 4 + step, y // 4 + step, value)
 
 
     def predict_inter(self, reader, block, pred_vec, has_delta, ref_plane_buffers):
@@ -123,11 +37,11 @@ class Frame:
         self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 1] = vec
         
         def predict_inter_callback(x, y, plane, **kwargs):
-            self.plane_buffer_setter(self.plane_buffers, plane, x, y, 
-                self.plane_buffer_getter(ref_plane_buffers, plane, x+vec["x"], y+vec["y"])
+            plane_buffer_setter(self.plane_buffers, plane, x, y, 
+                plane_buffer_getter(ref_plane_buffers, plane, x+vec["x"], y+vec["y"])
             )
         
-        self.plane_buffer_iterator(block, "yuv", predict_inter_callback)
+        plane_buffer_iterator(block, "yuv", predict_inter_callback)
 
 
     def predict_inter_dc(self, reader, block):
@@ -157,11 +71,11 @@ class Frame:
         dc["v"] *= 2
         
         def predict_inter_dc_callback(x, y, plane, **kwargs):
-            self.plane_buffer_setter(self.plane_buffers, plane, x, y, 
-                av_clip_pixel(self.plane_buffer_getter(self.ref_frame_objects[0].plane_buffers, plane, x+vec["x"], y+vec["y"]) + dc[plane])
+            plane_buffer_setter(self.plane_buffers, plane, x, y, 
+                av_clip_pixel(plane_buffer_getter(self.ref_frame_objects[0].plane_buffers, plane, x+vec["x"], y+vec["y"]) + dc[plane])
             )
         
-        self.plane_buffer_iterator(block, "yuv", predict_inter_dc_callback)
+        plane_buffer_iterator(block, "yuv", predict_inter_dc_callback)
 
 
     def predict_notile(self, reader, block):
@@ -259,11 +173,11 @@ class Frame:
             # average of both averages below
             sum_x = block["w"] // 2
             for x in range(block["w"]):
-                sum_x += self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+x, block["y"]-1)
+                sum_x += plane_buffer_getter(self.plane_buffers, plane, block["x"]+x, block["y"]-1)
             
             sum_y = block["h"] // 2
             for y in range(block["h"]):
-                sum_y += self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+y)
+                sum_y += plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+y)
             
             dc = ((sum_x // block["w"]) + (sum_y // block["h"]) + 1) // 2
             
@@ -271,7 +185,7 @@ class Frame:
             # average of pixels on the top border of current block
             sum_x = block["w"] // 2
             for x in range(block["w"]):
-                sum_x += self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+x, block["y"]-1)
+                sum_x += plane_buffer_getter(self.plane_buffers, plane, block["x"]+x, block["y"]-1)
             
             dc = sum_x // block["w"]
             
@@ -279,40 +193,40 @@ class Frame:
             # average of pixels on the left border of current block
             sum_y = block["h"] // 2
             for y in range(block["h"]):
-                sum_y += self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+y)
+                sum_y += plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+y)
             
             dc = sum_y // block["h"]
         
         def predict_dc_callback(x, y, plane, **kwargs):
-            self.plane_buffer_setter(self.plane_buffers, plane, x, y, dc)
+            plane_buffer_setter(self.plane_buffers, plane, x, y, dc)
         
-        self.plane_buffer_iterator(block, plane, predict_dc_callback)
+        plane_buffer_iterator(block, plane, predict_dc_callback)
 
     def predict_horizontal(self, block, plane):
         def predict_horizontal_callback(x, y, plane, **kwargs):
             # get pixel from the left border of current block
-            pixel = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, y)
-            self.plane_buffer_setter(self.plane_buffers, plane, x, y, pixel)
+            pixel = plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, y)
+            plane_buffer_setter(self.plane_buffers, plane, x, y, pixel)
         
-        self.plane_buffer_iterator(block, plane, predict_horizontal_callback)
+        plane_buffer_iterator(block, plane, predict_horizontal_callback)
 
     def predict_vertical(self, block, plane):
         def predict_vertical_callback(x, y, plane, **kwargs):
             # get pixel from the top border of current block
-            pixel = self.plane_buffer_getter(self.plane_buffers, plane, x, block["y"]-1)
-            self.plane_buffer_setter(self.plane_buffers, plane, x, y, pixel)
+            pixel = plane_buffer_getter(self.plane_buffers, plane, x, block["y"]-1)
+            plane_buffer_setter(self.plane_buffers, plane, x, y, pixel)
         
-        self.plane_buffer_iterator(block, plane, predict_vertical_callback)
+        plane_buffer_iterator(block, plane, predict_vertical_callback)
 
     def predict_plane(self, block, plane, param):
-        bottom_left = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+block["h"]-1)
-        top_right = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]-1)
+        bottom_left = plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+block["h"]-1)
+        top_right = plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]-1)
         print("plane bottom_left: " + str(bottom_left))
         print("plane top_right: " + str(top_right))
         print("plane param: " + str(param))
         pixel = (bottom_left + top_right + 1) // 2 + param
         print("plane px: " + str(pixel))
-        self.plane_buffer_setter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1, pixel)
+        plane_buffer_setter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1, pixel)
         
         def predict_plane_intern(block, plane):
             step = 2
@@ -322,34 +236,34 @@ class Frame:
             if block["w"] == step and block["h"] == step:
                 return
             elif block["w"] == step and block["h"] > step:
-                top = self.plane_buffer_getter(self.plane_buffers, plane, block["x"], block["y"]-1)
-                bottom = self.plane_buffer_getter(self.plane_buffers, plane, block["x"], block["y"]+block["h"]-1)
+                top = plane_buffer_getter(self.plane_buffers, plane, block["x"], block["y"]-1)
+                bottom = plane_buffer_getter(self.plane_buffers, plane, block["x"], block["y"]+block["h"]-1)
                 pixel = (top + bottom) // 2
-                self.plane_buffer_setter(self.plane_buffers, plane, block["x"], block["y"]+(block["h"]//2)-1, pixel)
+                plane_buffer_setter(self.plane_buffers, plane, block["x"], block["y"]+(block["h"]//2)-1, pixel)
                 predict_plane_intern(block_half_up(block), plane)
                 predict_plane_intern(block_half_down(block), plane)
             elif block["w"] > step and block["h"] == step:
-                left = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"])
-                right = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"])
+                left = plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"])
+                right = plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"])
                 pixel = (left + right) // 2
-                self.plane_buffer_setter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"], pixel)
+                plane_buffer_setter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"], pixel)
                 predict_plane_intern(block_half_left(block), plane)
                 predict_plane_intern(block_half_right(block), plane)
             else:
-                bottom_left = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+block["h"]-1)
-                top_right = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]-1)
-                bottom_right = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1)
+                bottom_left = plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+block["h"]-1)
+                top_right = plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]-1)
+                bottom_right = plane_buffer_getter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1)
                 bottom_center = (bottom_left + bottom_right) // 2
                 center_right = (top_right + bottom_right) // 2
-                self.plane_buffer_setter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"]+block["h"]-1, bottom_center)
-                self.plane_buffer_setter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+(block["h"]//2)-1, center_right)
+                plane_buffer_setter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"]+block["h"]-1, bottom_center)
+                plane_buffer_setter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+(block["h"]//2)-1, center_right)
                 if (block["w"] == 4*step or block["w"] == 16*step) is not (block["h"] == 4*step or block["h"] == 16*step):
-                    center_left = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+(block["h"]//2)-1)
+                    center_left = plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+(block["h"]//2)-1)
                     pixel = (center_left + center_right) // 2
                 else:
-                    top_center = self.plane_buffer_getter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"]-1)
+                    top_center = plane_buffer_getter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"]-1)
                     pixel = (top_center + bottom_center) // 2
-                self.plane_buffer_setter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"]+(block["h"]//2)-1, pixel)
+                plane_buffer_setter(self.plane_buffers, plane, block["x"]+(block["w"]//2)-1, block["y"]+(block["h"]//2)-1, pixel)
                 predict_plane_intern(block_half_up(block_half_left(block)), plane)
                 predict_plane_intern(block_half_up(block_half_right(block)), plane)
                 predict_plane_intern(block_half_down(block_half_left(block)), plane)
@@ -393,57 +307,57 @@ class Frame:
                 print("residu block (" + str(x) + ", " + str(y) + ") mask " + "{:05b}".format(residu_mask))
                 
                 if residu_mask & 1 != 0:
-                    coeff_left = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x  -1, block["y"]+y    )
-                    coeff_top  = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x    , block["y"]+y  -1)
+                    coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x  -1, block["y"]+y    )
+                    coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x    , block["y"]+y  -1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x  , block["y"]+y  , nc, "y")
                     print("out_total_coeff bit0: " + str(out_total_coeff))
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , out_total_coeff)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , out_total_coeff)
                 else:
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , 0)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , 0)
                 
                 if residu_mask & 2 != 0:
-                    coeff_left = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4-1, block["y"]+y    )
-                    coeff_top  = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4  , block["y"]+y  -1)
+                    coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4-1, block["y"]+y    )
+                    coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4  , block["y"]+y  -1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x+4, block["y"]+y  , nc, "y")
                     print("out_total_coeff bit1: " + str(out_total_coeff))
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , out_total_coeff)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , out_total_coeff)
                 else:
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , 0)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , 0)
                 
                 if residu_mask & 4 != 0:
-                    coeff_left = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x  -1, block["y"]+y+4  )
-                    coeff_top  = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x    , block["y"]+y+4-1)
+                    coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x  -1, block["y"]+y+4  )
+                    coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x    , block["y"]+y+4-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x  , block["y"]+y+4, nc, "y")
                     print("out_total_coeff bit2: " + str(out_total_coeff))
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, out_total_coeff)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, out_total_coeff)
                 else:
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, 0)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, 0)
                 
                 if residu_mask & 8 != 0:
-                    coeff_left = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4-1, block["y"]+y+4  )
-                    coeff_top  = self.coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4  , block["y"]+y+4-1)
+                    coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4-1, block["y"]+y+4  )
+                    coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4  , block["y"]+y+4-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(reader, block["x"]+x+4, block["y"]+y+4, nc, "y")
                     print("out_total_coeff bit3: " + str(out_total_coeff))
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, out_total_coeff)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, out_total_coeff)
                 else:
-                    self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, 0)
+                    coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, 0)
                 
                 if residu_mask & 16 != 0:
-                    coeff_left = self.coeff_buffer_getter(self.coeff_buffers, "uv", block["x"]+x-1, block["y"]+y  )
-                    coeff_top  = self.coeff_buffer_getter(self.coeff_buffers, "uv", block["x"]+x  , block["y"]+y-1)
+                    coeff_left = coeff_buffer_getter(self.coeff_buffers, "uv", block["x"]+x-1, block["y"]+y  )
+                    coeff_top  = coeff_buffer_getter(self.coeff_buffers, "uv", block["x"]+x  , block["y"]+y-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     print("nc: " + str(nc))
                     out_total_coeff_u = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "u")
                     out_total_coeff_v = self.decode_residu_cavlc(reader, block["x"]+x, block["y"]+y, nc, "v")
                     out_total_coeff = int((out_total_coeff_u + out_total_coeff_v + 1) // 2)
                     print("out_total_coeff bit4: " + str(out_total_coeff))
-                    self.coeff_buffer_setter(self.coeff_buffers, "uv", block["x"]+x, block["y"]+y, out_total_coeff)
+                    coeff_buffer_setter(self.coeff_buffers, "uv", block["x"]+x, block["y"]+y, out_total_coeff)
                 else:
-                    self.coeff_buffer_setter(self.coeff_buffers, "uv", block["x"]+x, block["y"]+y, 0)
+                    coeff_buffer_setter(self.coeff_buffers, "uv", block["x"]+x, block["y"]+y, 0)
 
     def decode_residu_cavlc(self, reader, x, y, nc, plane):
         coeff_token = reader.vlc2(vlc.coeff_token_vlc[ff_h264_cavlc_coeff_token_table_index[nc]])
@@ -550,27 +464,28 @@ class Frame:
             z2 = (dct[1 + 4*i]//2) -  dct[3 + 4*i]
             z3 =  dct[1 + 4*i]     + (dct[3 + 4*i]//2)
             
-            p = av_clip_pixel(self.plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*0) + ((z0 + z3) >> 6))
-            self.plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*0, p)
-            p = av_clip_pixel(self.plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*1) + ((z1 + z2) >> 6))
-            self.plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*1, p)
-            p = av_clip_pixel(self.plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*2) + ((z1 - z2) >> 6))
-            self.plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*2, p)
-            p = av_clip_pixel(self.plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*3) + ((z0 - z3) >> 6))
-            self.plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*3, p)
+            p = av_clip_pixel(plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*0) + ((z0 + z3) >> 6))
+            plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*0, p)
+            p = av_clip_pixel(plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*1) + ((z1 + z2) >> 6))
+            plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*1, p)
+            p = av_clip_pixel(plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*2) + ((z1 - z2) >> 6))
+            plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*2, p)
+            p = av_clip_pixel(plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*3) + ((z0 - z3) >> 6))
+            plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*3, p)
 
 
     def clear_total_coeff(self, block):
         for y in range(0, block["h"], 8):
             for x in range(0, block["w"], 8):
-                self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , 0)
-                self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, 0)
-                self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , 0)
-                self.coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, 0)
-                self.coeff_buffer_setter(self.coeff_buffers, "uv", block["x"]+x, block["y"]+y, 0)
+                coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , 0)
+                coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, 0)
+                coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , 0)
+                coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, 0)
+                coeff_buffer_setter(self.coeff_buffers, "uv", block["x"]+x, block["y"]+y, 0)
 
 
     def decode_mb(self, reader, block, pred_vec):
+        print(block)
         mode = reader.unsigned_expgolomb()
         print(mode)
         if mode == 0: # v-split, no residu
@@ -688,7 +603,7 @@ class Frame:
         }
         
         # read bits from little endian uint16 list from msb to lsb
-        reader = read.BitsReader(np.unpackbits([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])]), 0)
+        reader = io.BitsReader(np.unpackbits([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])]), 0)
         
         self.vectors = []
         for y in range((self.frame_height // 16) + 1):
@@ -717,8 +632,87 @@ class Frame:
                         self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 2]["y"]
                     ),
                 }
-                
+                print(block)
                 self.decode_mb(reader, block, pred_vec)
+        
+        """self.audio_frames = []
+        if self.audio_frames_qty > 50:
+            raise Exception("audio_frames_qty is " + str(self.audio_frames_qty))
+        for i in range(self.audio_frames_qty):
+            print("audio frame " + str(i) + "/" + str(self.audio_frames_qty))
+            audio_frame_header_word1 = reader.int(16)
+            audio_frame_header_word2 = reader.int(16)
+            audio_frame_object = {
+                "prev_frame_offset": (audio_frame_header_word1 >> 9) & 0x7f,
+                "scale_modifier_index": (audio_frame_header_word1 >> 6) & 0x7,
+                "pulse_start_position": (audio_frame_header_word2 >> 14) & 0x3,
+                "pulse_packing_mode": (audio_frame_header_word2 >> 12) & 0x3,
+                "lpc_codebook_indexes": [
+                    (audio_frame_header_word1 >> 0) & 0x3f,
+                    (audio_frame_header_word2 >> 6) & 0x3f,
+                    (audio_frame_header_word2 >> 0) & 0x3f
+                ]
+            }
+            audio_frame_object["data"] = []
+            audio_frame_object["pulse_values"] = []
+            if audio_frame_object["pulse_packing_mode"] == 0:
+                for i in range(8):
+                    audio_frame_object["data"].append(reader.int(16))
+                for i in range(8):
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 13) & 7)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 7)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 7) & 7)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 7)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 1) & 7)
+                audio_frame_object["pulse_values"].append(
+                    (audio_frame_object["data"][0] & 1) * 4 +
+                    (audio_frame_object["data"][1] & 1) * 2 +
+                    (audio_frame_object["data"][2] & 1) * 1
+                )
+                audio_frame_object["pulse_values"].append(
+                    (audio_frame_object["data"][3] & 1) * 4 +
+                    (audio_frame_object["data"][4] & 1) * 2 +
+                    (audio_frame_object["data"][5] & 1) * 1
+                )
+            elif audio_frame_object["pulse_packing_mode"] == 1:
+                for i in range(5):
+                    audio_frame_object["data"].append(reader.int(16))
+                for i in range(5):
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 14) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 12) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 8) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 6) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 2) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 0) & 3)
+            elif audio_frame_object["pulse_packing_mode"] == 2:
+                for i in range(4):
+                    audio_frame_object["data"].append(reader.int(16))
+                for i in range(4):
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 14) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 12) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 8) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 6) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 2) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 0) & 3)
+            elif audio_frame_object["pulse_packing_mode"] == 3:
+                for i in range(3):
+                    audio_frame_object["data"].append(reader.int(16))
+                for i in range(3):
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 14) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 12) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 8) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 6) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 2) & 3)
+                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 0) & 3)
+            self.audio_frames.append(audio_frame_object)
+            print(audio_frame_object)"""
+        
 
 
     def export_buffers(self):
@@ -736,40 +730,10 @@ class Frame:
 
 
     def export_image(self, filename):
-        test_image = frameconv.convert_frame_to_image(self.plane_buffers)
+        test_image = frame_convert.convert_frame_to_image(self.plane_buffers)
         test_image.save(filename)
 
 
 
 
-
-"""
-frame_object["audio_frames"] = []
-if frame_object["audio_frames_qty"] > 50:
-    print("decoding aborted prematurely: audio_frames_qty is " + str(frame_object["audio_frames_qty"]))
-    break
-for j in range(frame_object["audio_frames_qty"]):
-    audio_frame_header_word1 = reader.int(2)
-    audio_frame_header_word2 = reader.int(2)
-    audio_frame_object = {
-        "prev_frame_offset": (audio_frame_header_word1 >> 9) & 0x7f,
-        "scale_modifier_index": (audio_frame_header_word1 >> 6) & 0x7,
-        "pulse_start_position": (audio_frame_header_word2 >> 14) & 0x3,
-        "pulse_packing_mode": (audio_frame_header_word2 >> 12) & 0x3,
-        "lpc_codebook_indexes": [
-            (audio_frame_header_word1 >> 0) & 0x3f,
-            (audio_frame_header_word2 >> 6) & 0x3f,
-            (audio_frame_header_word2 >> 0) & 0x3f
-        ]
-    }
-    if audio_frame_object["pulse_packing_mode"] == 0:
-        audio_frame_object["data"] = reader(2*8)
-    elif audio_frame_object["pulse_packing_mode"] == 1:
-        audio_frame_object["data"] = reader(2*5)
-    elif audio_frame_object["pulse_packing_mode"] == 2:
-        audio_frame_object["data"] = reader(2*4)
-    elif audio_frame_object["pulse_packing_mode"] == 3:
-        audio_frame_object["data"] = reader(2*3)
-    frame_object["audio_frames"].append(audio_frame_object)
-"""
 
