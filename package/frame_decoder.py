@@ -6,18 +6,21 @@ from . import vlc
 from . import h264pred
 from . import frame_convert
 from .frame_includes import *
+from .audio_frame_decoder import AudioFrameDecoder
 
 
 
 
 
 class FrameDecoder:
-    def __init__(self, frame_width, frame_height, ref_frame_objects, qtab):
+    def __init__(self, frame_width, frame_height, ref_frame_objects, qtab, audio_extradata):
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.ref_frame_objects = ref_frame_objects
         self.qtab = qtab
+        self.audio_extradata = audio_extradata
         self.audio_frames_qty = None
+        self.audio_samples = None
         self.data = None
 
 
@@ -635,83 +638,37 @@ class FrameDecoder:
                 print(block)
                 self.decode_mb(reader, block, pred_vec)
         
-        """self.audio_frames = []
+        
+        self.audio_frames = []
         if self.audio_frames_qty > 50:
             raise Exception("audio_frames_qty is " + str(self.audio_frames_qty))
+        
+        # align with word
+        reader.offset = (reader.offset + 0xF) & 0xF
+        
+        self.audio_samples = []
         for i in range(self.audio_frames_qty):
             print("audio frame " + str(i) + "/" + str(self.audio_frames_qty))
             audio_frame_header_word1 = reader.int(16)
             audio_frame_header_word2 = reader.int(16)
-            audio_frame_object = {
-                "prev_frame_offset": (audio_frame_header_word1 >> 9) & 0x7f,
-                "scale_modifier_index": (audio_frame_header_word1 >> 6) & 0x7,
-                "pulse_start_position": (audio_frame_header_word2 >> 14) & 0x3,
-                "pulse_packing_mode": (audio_frame_header_word2 >> 12) & 0x3,
-                "lpc_codebook_indexes": [
-                    (audio_frame_header_word1 >> 0) & 0x3f,
-                    (audio_frame_header_word2 >> 6) & 0x3f,
-                    (audio_frame_header_word2 >> 0) & 0x3f
-                ]
-            }
-            audio_frame_object["data"] = []
-            audio_frame_object["pulse_values"] = []
-            if audio_frame_object["pulse_packing_mode"] == 0:
-                for i in range(8):
-                    audio_frame_object["data"].append(reader.int(16))
-                for i in range(8):
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 13) & 7)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 7)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 7) & 7)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 7)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 1) & 7)
-                audio_frame_object["pulse_values"].append(
-                    (audio_frame_object["data"][0] & 1) * 4 +
-                    (audio_frame_object["data"][1] & 1) * 2 +
-                    (audio_frame_object["data"][2] & 1) * 1
-                )
-                audio_frame_object["pulse_values"].append(
-                    (audio_frame_object["data"][3] & 1) * 4 +
-                    (audio_frame_object["data"][4] & 1) * 2 +
-                    (audio_frame_object["data"][5] & 1) * 1
-                )
-            elif audio_frame_object["pulse_packing_mode"] == 1:
-                for i in range(5):
-                    audio_frame_object["data"].append(reader.int(16))
-                for i in range(5):
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 14) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 12) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 8) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 6) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 2) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 0) & 3)
-            elif audio_frame_object["pulse_packing_mode"] == 2:
-                for i in range(4):
-                    audio_frame_object["data"].append(reader.int(16))
-                for i in range(4):
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 14) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 12) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 8) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 6) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 2) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 0) & 3)
-            elif audio_frame_object["pulse_packing_mode"] == 3:
-                for i in range(3):
-                    audio_frame_object["data"].append(reader.int(16))
-                for i in range(3):
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 14) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 12) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 10) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 8) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 6) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 4) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 2) & 3)
-                    audio_frame_object["pulse_values"].append((audio_frame_object["data"][i] >> 0) & 3)
+            audio_frame_object = AudioFrameDecoder()
+            audio_frame_object.audio_extradata = self.audio_extradata
+            audio_frame_object.prev_frame_offset = (audio_frame_header_word1 >> 9) & 0x7f
+            audio_frame_object.scale_modifier_index = (audio_frame_header_word1 >> 6) & 0x7
+            audio_frame_object.pulse_start_position = (audio_frame_header_word2 >> 14) & 0x3
+            audio_frame_object.pulse_packing_mode = (audio_frame_header_word2 >> 12) & 0x3
+            audio_frame_object.lpc_codebook_indexes = [
+                (audio_frame_header_word1 >> 0) & 0x3f,
+                (audio_frame_header_word2 >> 6) & 0x3f,
+                (audio_frame_header_word2 >> 0) & 0x3f
+            ]
+            audio_frame_object.data = []
+            for i in range([8, 5, 4, 3][audio_frame_object.pulse_packing_mode]):
+                audio_frame_object.data.append(reader.int(16))
+            audio_frame_object.decode()
+            self.audio_samples += audio_frame_object.samples
             self.audio_frames.append(audio_frame_object)
-            print(audio_frame_object)"""
+            print(audio_frame_object.pulse_values)
         
 
 

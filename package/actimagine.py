@@ -1,7 +1,7 @@
 # code adapted from https://lists.ffmpeg.org/pipermail/ffmpeg-devel/2021-March/277989.html
 
 import numpy as np
-import PIL
+import wave
 
 from .frame_decoder import FrameDecoder
 from . import io
@@ -89,7 +89,7 @@ class ActImagine:
         self.frame_objects = []
         ref_frame_objects = [None, None, None]
         for i in range(self.frames_qty):
-            frame_object = FrameDecoder(self.frame_width, self.frame_height, ref_frame_objects, self.qtab)
+            frame_object = FrameDecoder(self.frame_width, self.frame_height, ref_frame_objects, self.qtab, self.audio_extradata)
             frame_data_size = reader.int(2)
             frame_object.audio_frames_qty = reader.int(2)
             frame_object.data = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)
@@ -100,9 +100,26 @@ class ActImagine:
     # generate images and audio from vx data
     def interpret_vx(self):
         self.frame_number = 1
+        audio_samples = np.array([], dtype=np.float32)
         for frame_object in self.frame_objects:
             frame_object.decode()
             frame_object.export_image("frame{:04d}.png".format(self.frame_number))
+            audio_s = np.array(frame_object.audio_samples, dtype=np.float32)
+            print(frame_object.audio_samples)
+            print(audio_s)
+            audio_samples = np.concatenate((audio_samples, audio_s), axis=0)
+            """with wave.open("frame{:04d}.wav".format(self.frame_number), "w") as f:
+                f.setnchannels(1)
+                f.setsampwidth(4)
+                f.setframerate(self.audio_sample_rate)
+                # tobytes has the wrong endianness for a wav file
+                f.writeframes(audio_s.tobytes())"""
             self.frame_number += 1
+        audio_samples /= np.max(np.abs(audio_samples), axis=0)
+        """with wave.open("fullaudio.wav", "w") as f:
+            f.setnchannels(1)
+            f.setsampwidth(4)
+            f.setframerate(self.audio_sample_rate)
+            f.writeframes(audio_samples.tobytes())"""
 
 
