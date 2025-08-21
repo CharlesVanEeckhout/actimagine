@@ -1,4 +1,3 @@
-
 import numpy as np
 
 from . import io
@@ -398,7 +397,7 @@ class FrameDecoder:
                 else:
                     level_suffix = reader.int(suffix_length)
                 
-                level_code = level_suffix + (level_prefix << suffix_length) + 1
+                level_code = (level_prefix << suffix_length) + level_suffix + 1
                 
                 suffix_length += 1 if level_code > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
                 
@@ -427,10 +426,10 @@ class FrameDecoder:
         
         print(level)
 
-        self.decode_dct(reader, x, y, plane, level)
+        self.decode_dct(x, y, plane, level)
         return out_total_coeff
 
-    def decode_dct(self, reader, x, y, plane, level):
+    def decode_dct(self, x, y, plane, level):
         dct = [None] * len(zigzag_scan)
         
         # dezigzag
@@ -438,15 +437,11 @@ class FrameDecoder:
             dct[z] = level[i]
         
         # dequantize
-        for i in range(2):
-            for j in range(4):
-                dct[4*j + i] *= self.qtab[i][j]
-                dct[4*j + i + 2] *= self.qtab[i][j]
+        for i in range(16):
+            dct[i] *= self.qtab[(i & 1) + ((i >> 2) & 1)]
         
         # h264_idct_add
-        step = 2
-        if plane == "y":
-            step = 1
+        step = 1 if plane == "y" else 2
         
         dct[0] += 1 << 5
         
@@ -606,7 +601,7 @@ class FrameDecoder:
         }
         
         # read bits from little endian uint16 list from msb to lsb
-        reader = io.BitsReader(np.unpackbits([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])]), 0)
+        reader = io.BitsReader(self.data, 0)
         
         self.vectors = []
         for y in range((self.frame_height // 16) + 1):

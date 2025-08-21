@@ -8,12 +8,12 @@ from . import io
 
 
 quant4x4_tab = [
-    [ 0x0A, 0x0D, 0x0A, 0x0D, 0x0D, 0x10, 0x0D, 0x10 ],
-    [ 0x0B, 0x0E, 0x0B, 0x0E, 0x0E, 0x12, 0x0E, 0x12 ],
-    [ 0x0D, 0x10, 0x0D, 0x10, 0x10, 0x14, 0x10, 0x14 ],
-    [ 0x0E, 0x12, 0x0E, 0x12, 0x12, 0x17, 0x12, 0x17 ],
-    [ 0x10, 0x14, 0x10, 0x14, 0x14, 0x19, 0x14, 0x19 ],
-    [ 0x12, 0x17, 0x12, 0x17, 0x17, 0x1D, 0x17, 0x1D ]
+    [ 0x0A, 0x0D, 0x10 ],
+    [ 0x0B, 0x0E, 0x12 ],
+    [ 0x0D, 0x10, 0x14 ],
+    [ 0x0E, 0x12, 0x17 ],
+    [ 0x10, 0x14, 0x19 ],
+    [ 0x12, 0x17, 0x1D ]
 ]
 
 
@@ -74,16 +74,11 @@ class ActImagine:
             })
         
         
-        self.qtab = []
         if self.quantizer < 12 or self.quantizer > 161:
             raise Exception("quantizer " + str(self.quantizer) + " was out of bounds")
         qx = self.quantizer % 6
         qy = self.quantizer // 6
-        
-        for i in range(2):
-            self.qtab.append([])
-            for j in range(4):
-                self.qtab[i].append(quant4x4_tab[qx][4 * i + j] << qy)
+        self.qtab = [i << qy for i in quant4x4_tab[qx]]
         
         
         self.frame_objects = []
@@ -92,7 +87,8 @@ class ActImagine:
             frame_object = FrameDecoder(self.frame_width, self.frame_height, ref_frame_objects, self.qtab, self.audio_extradata)
             frame_data_size = reader.int(2)
             frame_object.audio_frames_qty = reader.int(2)
-            frame_object.data = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)
+            frame_object_data_bytes = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)
+            frame_object.data = np.unpackbits([byte for i in range(0, len(frame_object_data_bytes)-1, 2) for byte in reversed(frame_object_data_bytes[i:i+2])])
             self.frame_objects.append(frame_object)
             ref_frame_objects = [frame_object] + ref_frame_objects[:-1]
 

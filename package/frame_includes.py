@@ -20,7 +20,29 @@ zigzag_scan = [
     1*4+1, 2*4+0, 3*4+0, 2*4+1,
     1*4+2, 0*4+3, 1*4+3, 2*4+2,
     3*4+1, 3*4+2, 2*4+3, 3*4+3,
-];
+]
+
+# 4x4 filters to be multiplied by coefficients to form the residu
+dct_gradient = [
+    [ 1.0,  1.0,  1.0,  1.0], # cos(0)
+    [ 1.0,  0.5, -0.5, -1.0], # cos(pi*x)
+    [ 1.0, -1.0, -1.0,  1.0], # cos(2pi*x)
+    [ 0.5, -1.0,  1.0, -0.5], # cos(3pi*x)
+]
+
+def get_dct_filters(qtab):
+    dct_filters = []
+    for i in range(16):
+        yres = i % 4
+        xres = i // 4
+        dct_filters.append([])
+        for y in range(4):
+            dct_filters[i].append([])
+            for x in range(4):
+                filter_value = dct_gradient[yres][y] * dct_gradient[xres][x]
+                filter_value *= (1 << 6) / qtab[(yres & 1) + (xres & 1)]
+                dct_filters[i][y].append(filter_value)
+    return dct_filters
 
 
 def mid_pred(a, b, c):

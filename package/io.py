@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class BytesReader:
     def __init__(self, data, offset):
         self.data = data
@@ -56,7 +59,7 @@ class BitsReader:
             return ug // 2
         else:
             return -(ug // 2)
-    
+
     def vlc2(self, vlc):
         bit_string = str(self.bit())
         out = vlc.find_bit_string(bit_string)
@@ -70,7 +73,7 @@ class BitsReader:
 
 class BytesWriter:
     def __init__(self):
-        self.data = np.array([], dtype=np.ubyte)
+        self.data = []
 
     def bytes(self, data):
         self.data += data
@@ -81,7 +84,7 @@ class BytesWriter:
 
 class BitsWriter:
     def __init__(self):
-        self.data = np.array([], dtype=np.ubyte)
+        self.data = []
 
     def bit(self, value):
         self.data.append(value)
@@ -102,22 +105,22 @@ class BitsWriter:
             value = value // 2
         if bitorder == "little":
             out.reverse()
-        return out
+        self.bits(out)
 
     def unsigned_expgolomb(self, value):
         if value < 0:
             raise Exception("value is out of bounds")
         value += 1
         out = f"{value:b}"
-        out = "0" * len(out - 1) + out
-        return out
+        out = "0" * (len(out) - 1) + out
+        self.bits([int(bit) for bit in out])
 
     def signed_expgolomb(self, value):
         value = value * 2
         if value <= 0:
             value = 1 - value
         self.unsigned_expgolomb(value - 1)
-    
+
     def vlc2(self, value, vlc):
         if value < 0 or value >= len(vlc.bit_strings):
             raise Exception("value is out of bounds")
