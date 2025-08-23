@@ -11,6 +11,8 @@ class KeyframeOnlySimple:
 
     def predict_dc(self, reader, block, plane):
         dc = 128
+        print("predict_dc")
+        print(block)
         if block["x"] != 0 and block["y"] != 0:
             # average of both averages below
             sum_x = block["w"] // 2
@@ -38,7 +40,7 @@ class KeyframeOnlySimple:
                 sum_y += plane_buffer_getter(self.frame_encoder.actual_plane_buffers, plane, block["x"]-1, block["y"]+y)
             
             dc = sum_y // block["h"]
-        
+        print(dc)
         def predict_dc_callback(x, y, plane, **kwargs):
             plane_buffer_setter(self.frame_encoder.actual_plane_buffers, plane, x, y, dc)
         
@@ -99,6 +101,9 @@ class KeyframeOnlySimple:
     def encode_residu_cavlc(self, writer, x, y, nc, plane):
         level = self.encode_dct(x, y, plane)
         
+        # apply level to actual_plane_buffers
+        self.decode_dct(x, y, plane, level)
+        
         # prepare level to be encoded
         
         # trailing zeros
@@ -138,7 +143,7 @@ class KeyframeOnlySimple:
         # trailing one coefficients
         total_coeff = len(level)
         trailing_ones_signbits = []
-        for i in range(len(level)-1, -1, -1):
+        for i in range(len(level)-1, 0, -1): # even if the leftmost coeff is 1, it cannot be a trailing one
             if abs(level[i]) == 1:
                 # signbit of 1 is 0 and signbit of -1 is 1
                 trailing_ones_signbits.append(1 if level[i] < 0 else 0)
@@ -172,13 +177,15 @@ class KeyframeOnlySimple:
             level_suffixes.append(level_suffix)
             real_suffix_lengths.append(real_suffix_length)
 
-            suffix_length += 1 if level_code > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
+            print("level_code " + str(level_code) + " vs suffix limit "+ str(ff_h264_cavlc_suffix_limit[suffix_length + 1]))
+            suffix_length += 1 if abs(level_code) > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
             
             level.pop(i)
 
         print("level_code_signbits: " + str(level_code_signbits))
         print("level_prefixes:      " + str(level_prefixes))
         print("level_suffixes:      " + str(level_suffixes))
+        print("real_suffix_lengths: " + str(real_suffix_lengths))
         
         # encode level
         
@@ -250,6 +257,48 @@ class KeyframeOnlySimple:
             level.append(round(averages[zigzag_scan[i]]))
         print(level)
         return level
+
+    def decode_dct(self, x, y, plane, level):
+        dct = [None] * len(zigzag_scan)
+        
+        # dezigzag
+        for i, z in enumerate(zigzag_scan):
+            dct[z] = level[i]
+        
+        # dequantize
+        for i in range(16):
+            dct[i] *= self.frame_encoder.qtab[(i & 1) + ((i >> 2) & 1)]
+        
+        # h264_idct_add
+        step = 1 if plane == "y" else 2
+        
+        dct[0] += 1 << 5
+        
+        for i in range(4):
+            z0 =  dct[i + 4*0]     +  dct[i + 4*2]
+            z1 =  dct[i + 4*0]     -  dct[i + 4*2]
+            z2 = (dct[i + 4*1]//2) -  dct[i + 4*3]
+            z3 =  dct[i + 4*1]     + (dct[i + 4*3]//2)
+            
+            dct[i + 4*0] = z0 + z3
+            dct[i + 4*1] = z1 + z2
+            dct[i + 4*2] = z1 - z2
+            dct[i + 4*3] = z0 - z3
+        
+        for i in range(4):
+            z0 =  dct[0 + 4*i]     +  dct[2 + 4*i]
+            z1 =  dct[0 + 4*i]     -  dct[2 + 4*i]
+            z2 = (dct[1 + 4*i]//2) -  dct[3 + 4*i]
+            z3 =  dct[1 + 4*i]     + (dct[3 + 4*i]//2)
+            
+            p = av_clip_pixel(plane_buffer_getter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*0) + ((z0 + z3) >> 6))
+            plane_buffer_setter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*0, p)
+            p = av_clip_pixel(plane_buffer_getter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*1) + ((z1 + z2) >> 6))
+            plane_buffer_setter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*1, p)
+            p = av_clip_pixel(plane_buffer_getter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*2) + ((z1 - z2) >> 6))
+            plane_buffer_setter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*2, p)
+            p = av_clip_pixel(plane_buffer_getter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*3) + ((z0 - z3) >> 6))
+            plane_buffer_setter(self.frame_encoder.actual_plane_buffers, plane, x+step*i, y+step*3, p)
 
 
     def encode_mb(self, writer, block):
