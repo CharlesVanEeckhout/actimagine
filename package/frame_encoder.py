@@ -12,7 +12,7 @@ class FrameEncoder:
         self.ref_frame_objects = ref_frame_objects
         self.qtab = qtab
         self.audio_frames_qty = None
-        self.writer = io.BitsWriter()
+        self.writer = io.BitStreamWriter()
         self.strategy = None
 
 

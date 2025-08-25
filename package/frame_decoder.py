@@ -128,7 +128,7 @@ class FrameDecoder:
                     mode = 2
                 
                 if reader.bit() == 0:
-                    val = reader.int(3)
+                    val = reader.int_from_bits(3)
                     mode = val + (val >= mode)*1
                 
                 pred4_cache[1 + y2][1 + x2] = mode
@@ -393,9 +393,9 @@ class FrameDecoder:
                     level_prefix += 1
                 
                 if level_prefix == 15:
-                    level_suffix = reader.int(11)
+                    level_suffix = reader.int_from_bits(11)
                 else:
-                    level_suffix = reader.int(suffix_length)
+                    level_suffix = reader.int_from_bits(suffix_length)
                 
                 level_code = (level_prefix << suffix_length) + level_suffix + 1
                 
@@ -601,7 +601,8 @@ class FrameDecoder:
         }
         
         # read bits from little endian uint16 list from msb to lsb
-        reader = io.BitsReader(self.data, 0)
+        reader = io.DataReader()
+        reader.set_data_bytes([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])], bitorder="big")
         
         self.vectors = []
         for y in range((self.frame_height // 16) + 1):
@@ -639,13 +640,14 @@ class FrameDecoder:
             raise Exception("audio_frames_qty is " + str(self.audio_frames_qty))
         
         # align with word
-        reader.offset = (reader.offset + 0xF) & 0xF
+        while reader.offset % 2 != 0:
+            reader.bit()
         
         self.audio_samples = []
         for i in range(self.audio_frames_qty):
             print("audio frame " + str(i) + "/" + str(self.audio_frames_qty))
-            audio_frame_header_word1 = reader.int(16)
-            audio_frame_header_word2 = reader.int(16)
+            audio_frame_header_word1 = reader.int_from_bits(16)
+            audio_frame_header_word2 = reader.int_from_bits(16)
             audio_frame_object = AudioFrameDecoder()
             audio_frame_object.audio_extradata = self.audio_extradata
             audio_frame_object.prev_frame_offset = (audio_frame_header_word1 >> 9) & 0x7f
@@ -659,7 +661,7 @@ class FrameDecoder:
             ]
             audio_frame_object.data = []
             for i in range([8, 5, 4, 3][audio_frame_object.pulse_packing_mode]):
-                audio_frame_object.data.append(reader.int(16))
+                audio_frame_object.data.append(reader.int_from_bits(16))
             audio_frame_object.decode()
             self.audio_samples += audio_frame_object.samples
             self.audio_frames.append(audio_frame_object)

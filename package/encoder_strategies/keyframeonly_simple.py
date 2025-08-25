@@ -207,7 +207,7 @@ class KeyframeOnlySimple:
                     writer.bit(0)
                 writer.bit(1)
                 
-                writer.int(level_suffix, real_suffix_length)
+                writer.int_to_bits(level_suffix, real_suffix_length)
                 
                 writer.bit(level_code_signbit)
             
@@ -348,4 +348,8 @@ class KeyframeOnlySimple:
                 }
                 
                 self.encode_mb(writer, block)
+        
+        # align with word
+        while (len(writer.data) & 0xF) != 0:
+            writer.bit(0)
 

@@ -28,7 +28,7 @@ def main():
     frame_encoder.strategy = KeyframeOnlySimple()
     frame_encoder.encode()
     frame_decoder = FrameDecoder(im_width, im_height, [None, None, None], act.qtab, act.audio_extradata)
-    frame_decoder.data = frame_encoder.writer.data
+    frame_decoder.data = frame_encoder.writer.get_data_bytes()
     frame_decoder.audio_frames_qty = 0
     frame_decoder.decode()
     frame_decoder.export_image("frame_0001_codec.png")

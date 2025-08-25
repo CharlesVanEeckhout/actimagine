@@ -23,28 +23,30 @@ class ActImagine:
 
 
     def load_vx(self, data):
-        reader = io.BytesReader(data, 0)
+        reader = io.DataReader()
+        reader.set_data_bytes(data)
 
 
         self.file_signature = reader.bytes(4)
-        self.frames_qty = reader.int(4)
-        self.frame_width = reader.int(4)
-        self.frame_height = reader.int(4)
-        self.frame_rate = reader.int(4) / 0x10000
-        self.quantizer = reader.int(4)
-        self.audio_sample_rate = reader.int(4)
-        self.audio_streams_qty = reader.int(4)
-        self.frame_size_max = reader.int(4)
-        self.audio_extradata_offset = reader.int(4)
-        self.seek_table_offset = reader.int(4)
-        self.seek_table_entries_qty = reader.int(4)
+        self.frames_qty = reader.int_from_bytes(4)
+        self.frame_width = reader.int_from_bytes(4)
+        self.frame_height = reader.int_from_bytes(4)
+        self.frame_rate = reader.int_from_bytes(4) / 0x10000
+        self.quantizer = reader.int_from_bytes(4)
+        self.audio_sample_rate = reader.int_from_bytes(4)
+        self.audio_streams_qty = reader.int_from_bytes(4)
+        self.frame_size_max = reader.int_from_bytes(4)
+        self.audio_extradata_offset = reader.int_from_bytes(4)
+        self.seek_table_offset = reader.int_from_bytes(4)
+        self.seek_table_entries_qty = reader.int_from_bytes(4)
 
         if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
             raise Exception("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
 
 
         self.audio_extradata = {}
-        reader_temp = io.BytesReader(data, self.audio_extradata_offset)
+        reader_temp = io.DataReader()
+        reader_temp.set_data_bytes(data[self.audio_extradata_offset:])
 
         self.audio_extradata["lpc_codebooks"] = []
         for i in range(3):
@@ -52,25 +54,26 @@ class ActImagine:
             for j in range(64):
                 self.audio_extradata["lpc_codebooks"][i].append([])
                 for k in range(8):
-                    self.audio_extradata["lpc_codebooks"][i][j].append(reader_temp.int(2, signed=True))
+                    self.audio_extradata["lpc_codebooks"][i][j].append(reader_temp.int_from_bytes(2, signed=True))
 
         self.audio_extradata["scale_modifiers"] = []
         for i in range(8):
-            self.audio_extradata["scale_modifiers"].append(reader_temp.int(2))
+            self.audio_extradata["scale_modifiers"].append(reader_temp.int_from_bytes(2))
 
         self.audio_extradata["lpc_base"] = []
         for i in range(8):
-            self.audio_extradata["lpc_base"].append(reader_temp.int(4, signed=True))
+            self.audio_extradata["lpc_base"].append(reader_temp.int_from_bytes(4, signed=True))
 
-        self.audio_extradata["scale_initial"] = reader_temp.int(4)
+        self.audio_extradata["scale_initial"] = reader_temp.int_from_bytes(4)
 
 
         self.seek_table = []
-        reader_temp = io.BytesReader(data, self.seek_table_offset)
+        reader_temp = io.DataReader()
+        reader_temp.set_data_bytes(data[self.seek_table_offset:])
         for i in range(self.seek_table_entries_qty):
             self.seek_table.append({
-                "frame_id": reader_temp.int(4),
-                "frame_offset": reader_temp.int(4)
+                "frame_id": reader_temp.int_from_bytes(4),
+                "frame_offset": reader_temp.int_from_bytes(4)
             })
         
         
@@ -85,10 +88,9 @@ class ActImagine:
         ref_frame_objects = [None, None, None]
         for i in range(self.frames_qty):
             frame_object = FrameDecoder(self.frame_width, self.frame_height, ref_frame_objects, self.qtab, self.audio_extradata)
-            frame_data_size = reader.int(2)
-            frame_object.audio_frames_qty = reader.int(2)
-            frame_object_data_bytes = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)
-            frame_object.data = np.unpackbits([byte for i in range(0, len(frame_object_data_bytes)-1, 2) for byte in reversed(frame_object_data_bytes[i:i+2])])
+            frame_data_size = reader.int_from_bytes(2)
+            frame_object.audio_frames_qty = reader.int_from_bytes(2)
+            frame_object.data = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)
             self.frame_objects.append(frame_object)
             ref_frame_objects = [frame_object] + ref_frame_objects[:-1]
 
