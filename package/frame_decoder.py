@@ -26,23 +26,23 @@ class FrameDecoder:
     def predict_inter(self, reader, block, pred_vec, has_delta, ref_plane_buffers):
         if ref_plane_buffers is None:
             raise Exception("ref_plane_buffers was None")
-        
+
         vec = pred_vec.copy()
         if has_delta:
             vec["x"] += reader.signed_expgolomb()
             vec["y"] += reader.signed_expgolomb()
-        
+
         if block["x"] + vec["x"] < 0 or block["x"] + vec["x"] + block["w"] > self.frame_width or \
             block["y"] + vec["y"] < 0 or block["y"] + vec["y"] + block["h"] > self.frame_height:
             raise Exception("motion vector moves block out of bounds")
-        
+
         self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 1] = vec
-        
+
         def predict_inter_callback(x, y, plane, **kwargs):
-            plane_buffer_setter(self.plane_buffers, plane, x, y, 
+            plane_buffer_setter(self.plane_buffers, plane, x, y,
                 plane_buffer_getter(ref_plane_buffers, plane, x+vec["x"], y+vec["y"])
             )
-        
+
         plane_buffer_iterator(block, "yuv", predict_inter_callback)
 
 
@@ -51,32 +51,32 @@ class FrameDecoder:
             "x": reader.signed_expgolomb(),
             "y": reader.signed_expgolomb()
         }
-        
+
         if block["x"] + vec["x"] < 0 or block["x"] + vec["x"] + block["w"] > self.frame_width or \
             block["y"] + vec["y"] < 0 or block["y"] + vec["y"] + block["h"] > self.frame_height:
             raise Exception("motion vector out of bounds")
-        
+
         dc = {}
         dc["y"] = reader.signed_expgolomb()
         if dc["y"] < -(1 << 16) or dc["y"] >= (1 << 16):
             raise Exception("invalid dc offset")
         dc["y"] *= 2
-        
+
         dc["u"] = reader.signed_expgolomb()
         if dc["u"] < -(1 << 16) or dc["u"] >= (1 << 16):
             raise Exception("invalid dc offset")
         dc["u"] *= 2
-        
+
         dc["v"] = reader.signed_expgolomb()
         if dc["v"] < -(1 << 16) or dc["v"] >= (1 << 16):
             raise Exception("invalid dc offset")
         dc["v"] *= 2
-        
+
         def predict_inter_dc_callback(x, y, plane, **kwargs):
-            plane_buffer_setter(self.plane_buffers, plane, x, y, 
+            plane_buffer_setter(self.plane_buffers, plane, x, y,
                 av_clip_pixel(plane_buffer_getter(self.ref_frame_objects[0].plane_buffers, plane, x+vec["x"], y+vec["y"]) + dc[plane])
             )
-        
+
         plane_buffer_iterator(block, "yuv", predict_inter_dc_callback)
 
 
@@ -88,7 +88,7 @@ class FrameDecoder:
         elif mode == 1:
             self.predict_horizontal(block, "y")
         elif mode == 2:
-            self.predict_dc(reader, block, "y")
+            self.predict_dc(block, "y")
         elif mode == 3:
             self.predict_plane(block, "y", 0)
         else:
@@ -99,8 +99,8 @@ class FrameDecoder:
         mode = reader.unsigned_expgolomb()
         print("predict notile uv " + str(mode))
         if mode == 0:
-            self.predict_dc(reader, block, "u")
-            self.predict_dc(reader, block, "v")
+            self.predict_dc(block, "u")
+            self.predict_dc(block, "v")
         elif mode == 1:
             self.predict_horizontal(block, "u")
             self.predict_horizontal(block, "v")
@@ -120,24 +120,24 @@ class FrameDecoder:
             pred4_cache.append([])
             for j in range(5):
                 pred4_cache[i].append(9)
-        
+
         for y2 in range(block["h"] // 4):
             for x2 in range(block["w"] // 4):
                 mode = min(pred4_cache[1 + y2 - 1][1 + x2], pred4_cache[1 + y2][1 + x2 - 1])
                 if mode == 9:
                     mode = 2
-                
+
                 if reader.bit() == 0:
                     val = reader.int_from_bits(3)
                     mode = val + (val >= mode)*1
-                
+
                 pred4_cache[1 + y2][1 + x2] = mode
-                
+
                 dst = {
                     "x": block["x"] + x2*4,
                     "y": block["y"] + y2*4
                 }
-                
+
                 if mode == 0: # vertical
                     h264pred.pred4x4_vertical(self.plane_buffers["y"], dst)
                 elif mode == 1: # horizontal
@@ -165,43 +165,43 @@ class FrameDecoder:
                     h264pred.pred4x4_horizontal_up(self.plane_buffers["y"], dst)
                 else:
                     raise Exception("invalid predict4 mode " + str(mode))
-        
+
         self.predict_notile_uv(reader, block)
 
 
-    def predict_dc(self, reader, block, plane):
+    def predict_dc(self, block, plane):
         dc = 128
         if block["x"] != 0 and block["y"] != 0:
             # average of both averages below
             sum_x = block["w"] // 2
             for x in range(block["w"]):
                 sum_x += plane_buffer_getter(self.plane_buffers, plane, block["x"]+x, block["y"]-1)
-            
+
             sum_y = block["h"] // 2
             for y in range(block["h"]):
                 sum_y += plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+y)
-            
+
             dc = ((sum_x // block["w"]) + (sum_y // block["h"]) + 1) // 2
-            
+
         elif block["x"] == 0 and block["y"] != 0:
             # average of pixels on the top border of current block
             sum_x = block["w"] // 2
             for x in range(block["w"]):
                 sum_x += plane_buffer_getter(self.plane_buffers, plane, block["x"]+x, block["y"]-1)
-            
+
             dc = sum_x // block["w"]
-            
+
         elif block["x"] != 0 and block["y"] == 0:
             # average of pixels on the left border of current block
             sum_y = block["h"] // 2
             for y in range(block["h"]):
                 sum_y += plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, block["y"]+y)
-            
+
             dc = sum_y // block["h"]
-        
+
         def predict_dc_callback(x, y, plane, **kwargs):
             plane_buffer_setter(self.plane_buffers, plane, x, y, dc)
-        
+
         plane_buffer_iterator(block, plane, predict_dc_callback)
 
     def predict_horizontal(self, block, plane):
@@ -209,7 +209,7 @@ class FrameDecoder:
             # get pixel from the left border of current block
             pixel = plane_buffer_getter(self.plane_buffers, plane, block["x"]-1, y)
             plane_buffer_setter(self.plane_buffers, plane, x, y, pixel)
-        
+
         plane_buffer_iterator(block, plane, predict_horizontal_callback)
 
     def predict_vertical(self, block, plane):
@@ -217,7 +217,7 @@ class FrameDecoder:
             # get pixel from the top border of current block
             pixel = plane_buffer_getter(self.plane_buffers, plane, x, block["y"]-1)
             plane_buffer_setter(self.plane_buffers, plane, x, y, pixel)
-        
+
         plane_buffer_iterator(block, plane, predict_vertical_callback)
 
     def predict_plane(self, block, plane, param):
@@ -229,12 +229,12 @@ class FrameDecoder:
         pixel = (bottom_left + top_right + 1) // 2 + param
         print("plane px: " + str(pixel))
         plane_buffer_setter(self.plane_buffers, plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1, pixel)
-        
+
         def predict_plane_intern(block, plane):
             step = 2
             if plane == "y":
                 step = 1
-            
+
             if block["w"] == step and block["h"] == step:
                 return
             elif block["w"] == step and block["h"] > step:
@@ -270,7 +270,7 @@ class FrameDecoder:
                 predict_plane_intern(block_half_up(block_half_right(block)), plane)
                 predict_plane_intern(block_half_down(block_half_left(block)), plane)
                 predict_plane_intern(block_half_down(block_half_right(block)), plane)
-        
+
         predict_plane_intern(block, plane)
 
 
@@ -281,14 +281,14 @@ class FrameDecoder:
             raise Exception("invalid plane param " + str(param))
         print("mbplane y param: " + str(param))
         self.predict_plane(block, "y", param * 2)
-        
+
         # u
         param = reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
             raise Exception("invalid plane param " + str(param))
         print("mbplane u param: " + str(param))
         self.predict_plane(block, "u", param * 2)
-        
+
         # v
         param = reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
@@ -307,7 +307,7 @@ class FrameDecoder:
                     raise Exception("invalid residu mask tab index " + str(residu_mask_tab_index))
                 residu_mask = ff_actimagine_vx_residu_mask_new_tab[residu_mask_tab_index]
                 print("residu block (" + str(x) + ", " + str(y) + ") mask " + "{:05b}".format(residu_mask))
-                
+
                 if residu_mask & 1 != 0:
                     coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x  -1, block["y"]+y    )
                     coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x    , block["y"]+y  -1)
@@ -317,7 +317,7 @@ class FrameDecoder:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , out_total_coeff)
                 else:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y  , 0)
-                
+
                 if residu_mask & 2 != 0:
                     coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4-1, block["y"]+y    )
                     coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4  , block["y"]+y  -1)
@@ -327,7 +327,7 @@ class FrameDecoder:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , out_total_coeff)
                 else:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y  , 0)
-                
+
                 if residu_mask & 4 != 0:
                     coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x  -1, block["y"]+y+4  )
                     coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x    , block["y"]+y+4-1)
@@ -337,7 +337,7 @@ class FrameDecoder:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, out_total_coeff)
                 else:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x  , block["y"]+y+4, 0)
-                
+
                 if residu_mask & 8 != 0:
                     coeff_left = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4-1, block["y"]+y+4  )
                     coeff_top  = coeff_buffer_getter(self.coeff_buffers, "y", block["x"]+x+4  , block["y"]+y+4-1)
@@ -347,7 +347,7 @@ class FrameDecoder:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, out_total_coeff)
                 else:
                     coeff_buffer_setter(self.coeff_buffers, "y", block["x"]+x+4, block["y"]+y+4, 0)
-                
+
                 if residu_mask & 16 != 0:
                     coeff_left = coeff_buffer_getter(self.coeff_buffers, "uv", block["x"]+x-1, block["y"]+y  )
                     coeff_top  = coeff_buffer_getter(self.coeff_buffers, "uv", block["x"]+x  , block["y"]+y-1)
@@ -366,22 +366,22 @@ class FrameDecoder:
         print("coeff_token: " + str(coeff_token))
         if coeff_token == -1:
             raise Exception("invalid vlc")
-        
+
         trailing_ones = coeff_token & 3
         total_coeff   = coeff_token >> 2
         out_total_coeff = total_coeff
-        
-        level = []
         if total_coeff == 0:
             return out_total_coeff
-        elif total_coeff == 16:
+
+        level = []
+        if total_coeff == 16:
             zeros_left = 0
         else:
             zeros_left = reader.vlc2(vlc.total_zeros_vlc[total_coeff])
             print("zeros_left: " + str(zeros_left))
             for i in range(16 - (total_coeff + zeros_left)):
                 level.insert(0, 0)
-        
+
         suffix_length = 0
         while True:
             if trailing_ones > 0:
@@ -391,39 +391,39 @@ class FrameDecoder:
                 level_prefix = 0
                 while reader.bit() == 0:
                     level_prefix += 1
-                
+
                 if level_prefix == 15:
                     level_suffix = reader.int_from_bits(11)
                 else:
                     level_suffix = reader.int_from_bits(suffix_length)
-                
+
                 level_code = (level_prefix << suffix_length) + level_suffix + 1
-                
+
                 suffix_length += 1 if level_code > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
-                
+
                 if reader.bit() == 1:
                     level_code = -level_code
                 level.insert(0, level_code)
-            
+
             total_coeff -= 1
             if total_coeff == 0:
                 break
-            
+
             if zeros_left == 0:
                 continue
-            
+
             if zeros_left < 7:
                 run_before = reader.vlc2(vlc.run_vlc[zeros_left])
             else:
                 run_before = reader.vlc2(vlc.run7_vlc)
-            
+
             zeros_left -= run_before
             for i in range(run_before):
                 level.insert(0, 0)
-        
+
         for i in range(zeros_left):
             level.insert(0, 0)
-        
+
         print(level)
 
         self.decode_dct(x, y, plane, level)
@@ -431,37 +431,37 @@ class FrameDecoder:
 
     def decode_dct(self, x, y, plane, level):
         dct = [None] * len(zigzag_scan)
-        
+
         # dezigzag
         for i, z in enumerate(zigzag_scan):
             dct[z] = level[i]
-        
+
         # dequantize
         for i in range(16):
             dct[i] *= self.qtab[(i & 1) + ((i >> 2) & 1)]
-        
+
         # h264_idct_add
         step = 1 if plane == "y" else 2
-        
+
         dct[0] += 1 << 5
-        
+
         for i in range(4):
             z0 =  dct[i + 4*0]     +  dct[i + 4*2]
             z1 =  dct[i + 4*0]     -  dct[i + 4*2]
             z2 = (dct[i + 4*1]//2) -  dct[i + 4*3]
             z3 =  dct[i + 4*1]     + (dct[i + 4*3]//2)
-            
+
             dct[i + 4*0] = z0 + z3
             dct[i + 4*1] = z1 + z2
             dct[i + 4*2] = z1 - z2
             dct[i + 4*3] = z0 - z3
-        
+
         for i in range(4):
             z0 =  dct[0 + 4*i]     +  dct[2 + 4*i]
             z1 =  dct[0 + 4*i]     -  dct[2 + 4*i]
             z2 = (dct[1 + 4*i]//2) -  dct[3 + 4*i]
             z3 =  dct[1 + 4*i]     + (dct[3 + 4*i]//2)
-            
+
             p = av_clip_pixel(plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*0) + ((z0 + z3) >> 6))
             plane_buffer_setter(self.plane_buffers, plane, x+step*i, y+step*0, p)
             p = av_clip_pixel(plane_buffer_getter(self.plane_buffers, plane, x+step*i, y+step*1) + ((z1 + z2) >> 6))
@@ -594,22 +594,22 @@ class FrameDecoder:
             "u": np.zeros((self.frame_height // 2, self.frame_width // 2), dtype=np.uint16),
             "v": np.zeros((self.frame_height // 2, self.frame_width // 2), dtype=np.uint16)
         }
-        
+
         self.coeff_buffers = {
             "y": np.zeros((self.frame_height // 4 + 1, self.frame_width // 4 + 1), dtype=np.uint16),
             "uv": np.zeros((self.frame_height // 8 + 1, self.frame_width // 8 + 1), dtype=np.uint16)
         }
-        
+
         # read bits from little endian uint16 list from msb to lsb
         reader = io.DataReader()
         reader.set_data_bytes([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])], bitorder="big")
-        
+
         self.vectors = []
         for y in range((self.frame_height // 16) + 1):
             self.vectors.append([])
             for x in range((self.frame_width // 16) + 2):
                 self.vectors[y].append({"x": 0, "y": 0})
-        
+
         for y in range(0, self.frame_height, 16):
             for x in range(0, self.frame_width, 16):
                 block = {
@@ -618,7 +618,7 @@ class FrameDecoder:
                     "w": 16,
                     "h": 16
                 }
-                
+
                 pred_vec = {
                     "x": mid_pred(
                         self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 0]["x"],
@@ -633,16 +633,16 @@ class FrameDecoder:
                 }
                 print(block)
                 self.decode_mb(reader, block, pred_vec)
-        
-        
+
+
         self.audio_frames = []
         if self.audio_frames_qty > 50:
             raise Exception("audio_frames_qty is " + str(self.audio_frames_qty))
-        
+
         # align with word
         while reader.offset % 2 != 0:
             reader.bit()
-        
+
         self.audio_samples = []
         for i in range(self.audio_frames_qty):
             print("audio frame " + str(i) + "/" + str(self.audio_frames_qty))
@@ -666,18 +666,18 @@ class FrameDecoder:
             self.audio_samples += audio_frame_object.samples
             self.audio_frames.append(audio_frame_object)
             print(audio_frame_object.pulse_values)
-        
 
 
-    def export_buffers(self):
+
+    def export_buffers(self, filename):
         for plane in ["y", "u", "v"]:
-            with open("frame{:04d}_{}.bin".format(self.frame_number, plane), "wb") as f:
+            with open(f"{filename}_{plane}.bin", "wb") as f:
                 for row in self.plane_buffers[plane]:
                     for pixel in row:
                         f.write(pixel.astype(np.uint8))
-        
+
         for plane in ["y", "uv"]:
-            with open("frame{:04d}_coeff{}.bin".format(self.frame_number, plane), "wb") as f:
+            with open(f"{filename}_coeff{plane}.bin", "wb") as f:
                 for row in self.coeff_buffers[plane]:
                     for coeff in row:
                         f.write(coeff.astype(np.uint8))

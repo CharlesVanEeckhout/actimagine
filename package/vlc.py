@@ -2,13 +2,12 @@
 class VLC:
     def __init__(self, bits, codes):
         self.bit_strings = []
-        
         for (b, c) in zip(bits, codes, strict=True):
             bit_string = ("{:0" + str(b) + "b}").format(c)
             if len(bit_string) != b:
                 bit_string = bit_string[len(bit_string)-b:]
             self.bit_strings.append(bit_string)
-    
+
     def find_bit_string(self, bit_string):
         return [bs for bs in enumerate(self.bit_strings) if bs[1].startswith(bit_string)]
 

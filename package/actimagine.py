@@ -75,15 +75,15 @@ class ActImagine:
                 "frame_id": reader_temp.int_from_bytes(4),
                 "frame_offset": reader_temp.int_from_bytes(4)
             })
-        
-        
+
+
         if self.quantizer < 12 or self.quantizer > 161:
             raise Exception("quantizer " + str(self.quantizer) + " was out of bounds")
         qx = self.quantizer % 6
         qy = self.quantizer // 6
         self.qtab = [i << qy for i in quant4x4_tab[qx]]
-        
-        
+
+
         self.frame_objects = []
         ref_frame_objects = [None, None, None]
         for i in range(self.frames_qty):

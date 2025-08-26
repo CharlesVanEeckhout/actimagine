@@ -18,7 +18,7 @@ def convert_yuv_to_rgb(yuv):
     r = y + 2*v
     g = y - u//2 - v
     b = y + 2*u
-    
+
     return (r, g, b)
     #return yuv
 
@@ -36,7 +36,7 @@ def convert_yuv_to_smpte170m(yuv):
 
 def convert_frame_to_image(frame):
     image = Image.new("RGB", (frame["y"].shape[1], frame["y"].shape[0]))
-    
+
     for y in range(frame["y"].shape[0]):
         for x in range(frame["y"].shape[1]):
             image.putpixel((x, y), convert_yuv_to_rgb((
@@ -44,24 +44,24 @@ def convert_frame_to_image(frame):
                 int(frame["u"][y//2][x//2]),
                 int(frame["v"][y//2][x//2])
             )))
-    
+
     return image
 
 
 def convert_image_to_frame(image):
     if image.mode not in ["RGB", "RGBA"]:
         raise Exception("image mode is not RGB")
-    
+
     frame_width, frame_height = image.size
     if frame_width % 2 != 0 or frame_height % 2 != 0:
-        raise Exception("image cannot be converted to frame, because its resolution is not a multiple of 2")
-    
+        raise Exception("image's resolution is not a multiple of 2")
+
     frame = {
         "y": np.zeros((frame_height, frame_width), dtype=np.uint16),
         "u": np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint16),
         "v": np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint16)
     }
-    
+
     for y in range(0, frame["y"].shape[0], 2):
         for x in range(0, frame["y"].shape[1], 2):
             yuv00 = convert_rgb_to_yuv(image.getpixel((x  , y  ))[:3])
@@ -74,6 +74,6 @@ def convert_image_to_frame(image):
             frame["y"][y+1][x+1] = yuv11[0]
             frame["u"][y//2][x//2] = round((yuv00[1] + yuv01[1] + yuv10[1] + yuv11[1]) / 4)
             frame["v"][y//2][x//2] = round((yuv00[2] + yuv01[2] + yuv10[2] + yuv11[2]) / 4)
-    
+
     return frame
 

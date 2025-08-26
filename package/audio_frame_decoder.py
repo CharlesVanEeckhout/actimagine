@@ -32,7 +32,7 @@ class AudioFrameDecoder:
         print(lpc_filter_difference)
         print(self.pulse_start_position)
         print(self.prev_frame_offset)
-        
+
         scale = self.audio_extradata["scale_modifiers"][self.scale_modifier_index]
         distance = [3, 3, 4, 5][self.pulse_packing_mode]
         if self.pulse_packing_mode == 0:
@@ -49,15 +49,15 @@ class AudioFrameDecoder:
                 (self.data[4] & 1) * 2 +
                 (self.data[5] & 1) * 1
             )
-            
+
             self.pulse_values = [(val * 2 - 7) * scale for val in self.pulse_values]
         else:
             for i in range(len(self.data)):
                 for j in range(16 - 2, -1, -2):
                     self.pulse_values.append((self.data[i] >> j) & 0x3)
-            
+
             self.pulse_values = [(val * 2 - 3) * scale for val in self.pulse_values]
-        
+
         self.samples = []
         for i in range(128):
             index = (i - self.pulse_start_position) / distance
