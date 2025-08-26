@@ -137,7 +137,7 @@ def pred4x4_vertical_right(plane, dst):
     l0 = plane[dst["y"] + 0][dst["x"] - 1]
     l1 = plane[dst["y"] + 1][dst["x"] - 1]
     l2 = plane[dst["y"] + 2][dst["x"] - 1]
-    l3 = plane[dst["y"] + 3][dst["x"] - 1]
+    #l3 = plane[dst["y"] + 3][dst["x"] - 1]
 
     pixels = [
         (l0 + 2*l1 + l2 + 2) // 4, # (0,3)
@@ -164,7 +164,7 @@ def pred4x4_horizontal_down(plane, dst):
     t0 = plane[dst["y"] - 1][dst["x"] + 0]
     t1 = plane[dst["y"] - 1][dst["x"] + 1]
     t2 = plane[dst["y"] - 1][dst["x"] + 2]
-    t3 = plane[dst["y"] - 1][dst["x"] + 3]
+    #t3 = plane[dst["y"] - 1][dst["x"] + 3]
 
     l0 = plane[dst["y"] + 0][dst["x"] - 1]
     l1 = plane[dst["y"] + 1][dst["x"] - 1]
@@ -199,7 +199,7 @@ def pred4x4_vertical_left(plane, dst):
     t4 = plane[dst["y"] - 1][dst["x"] + 4]
     t5 = plane[dst["y"] - 1][dst["x"] + 5]
     t6 = plane[dst["y"] - 1][dst["x"] + 6]
-    t7 = plane[dst["y"] - 1][dst["x"] + 7]
+    #t7 = plane[dst["y"] - 1][dst["x"] + 7]
 
     pixels = [
         (t0 + t1 + 1) // 2,        # (0,0)
