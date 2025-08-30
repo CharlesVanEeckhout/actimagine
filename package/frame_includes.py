@@ -84,26 +84,12 @@ def block_half_down(block):
     }
 
 
-def plane_buffer_getter(plane_buffers, plane, x, y):
-    step = 1 if plane == "y" else 2
-    return plane_buffers[plane][y // step][x // step]
+def get_step(plane):
+    return 1 if plane == "y" else 2
 
-def plane_buffer_setter(plane_buffers, plane, x, y, value):
-    step = 1 if plane == "y" else 2
-    plane_buffers[plane][y // step][x // step] = value
-
-def plane_buffer_iterator(block, planes, callback, **kwargs):
+def plane_buffer_iterator(block, planes, callback):
     for plane in planes:
-        step = 1 if plane == "y" else 2
+        step = get_step(plane)
         for y in range(block["y"], block["y"] + block["h"], step):
             for x in range(block["x"], block["x"] + block["w"], step):
-                callback(x, y, plane, **kwargs)
-
-def coeff_buffer_getter(coeff_buffers, plane, x, y):
-    step = 1 if plane == "y" else 2
-    return plane_buffer_getter(coeff_buffers, plane, x // 4 + step, y // 4 + step)
-
-def coeff_buffer_setter(coeff_buffers, plane, x, y, value):
-    step = 1 if plane == "y" else 2
-    plane_buffer_setter(coeff_buffers, plane, x // 4 + step, y // 4 + step, value)
-
+                callback(x, y, plane)

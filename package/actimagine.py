@@ -3,7 +3,7 @@
 import numpy as np
 import wave
 
-from .frame_decoder import FrameDecoder
+from .avframe import AVFrame
 from . import io
 
 
@@ -84,26 +84,28 @@ class ActImagine:
         self.qtab = [i << qy for i in quant4x4_tab[qx]]
 
 
-        self.frame_objects = []
-        ref_frame_objects = [None, None, None]
+        self.avframes = []
+        ref_vframes = [None, None, None]
         for i in range(self.frames_qty):
-            frame_object = FrameDecoder(self.frame_width, self.frame_height, ref_frame_objects, self.qtab, self.audio_extradata)
+            avframe = AVFrame()
             frame_data_size = reader.int_from_bytes(2)
-            frame_object.audio_frames_qty = reader.int_from_bytes(2)
-            frame_object.data = np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte)
-            self.frame_objects.append(frame_object)
-            ref_frame_objects = [frame_object] + ref_frame_objects[:-1]
+            aframes_qty = reader.int_from_bytes(2)
+            avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
+            avframe.init_aframes(aframes_qty, self.audio_extradata)
+            avframe.set_data(np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte))
+            self.avframes.append(avframe)
+            ref_vframes = [avframe.vframe] + ref_vframes[:-1]
 
 
     # generate images and audio from vx data
     def interpret_vx(self):
         self.frame_number = 1
         audio_samples = np.array([], dtype=np.float32)
-        for frame_object in self.frame_objects:
-            frame_object.decode()
-            frame_object.export_image("frame{:04d}.png".format(self.frame_number))
-            audio_s = np.array(frame_object.audio_samples, dtype=np.float32)
-            print(frame_object.audio_samples)
+        for avframe in self.avframes:
+            avframe.decode()
+            avframe.vframe.export_image("frame{:04d}.png".format(self.frame_number))
+            audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
+            print(avframe.get_audio_samples())
             print(audio_s)
             audio_samples = np.concatenate((audio_samples, audio_s), axis=0)
             """with wave.open("frame{:04d}.wav".format(self.frame_number), "w") as f:

@@ -1,24 +1,47 @@
+import numpy as np
+
+from . import vframe_convert
+from .vframe_decoder import VFrameDecoder
+from .vframe_encoder import VFrameEncoder
+
 
 class VFrame:
-    def __init__(self, width, height, ref_avframe_objects, qtab):
+    def __init__(self, width, height, ref_vframes, qtab):
         self.width = width
         self.height = height
-        self.ref_avframe_objects = ref_avframe_objects
+        self.ref_vframes = ref_vframes
         self.qtab = qtab
         self.plane_buffers = None
-    
-    
+
+
     def decode(self, reader):
         self.plane_buffers = {
-            "y": np.zeros((self.frame_height, self.frame_width), dtype=np.uint16),
-            "u": np.zeros((self.frame_height // 2, self.frame_width // 2), dtype=np.uint16),
-            "v": np.zeros((self.frame_height // 2, self.frame_width // 2), dtype=np.uint16)
+            "y": np.zeros((self.height, self.width), dtype=np.uint16),
+            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16),
+            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16)
         }
-        
+        vframe_decoder = VFrameDecoder(self, reader)
+        vframe_decoder.decode()
 
 
-    def encode(self, writer):
-        
+    def encode(self, writer, goal_plane_buffers, strategy):
+        self.plane_buffers = {
+            "y": np.zeros((self.height, self.width), dtype=np.uint16),
+            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16),
+            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16)
+        }
+        vframe_encoder = VFrameEncoder(self, writer, goal_plane_buffers, strategy)
+        vframe_encoder.encode()
+
+
+    def plane_buffer_getter(self, plane, x, y):
+        step = 1 if plane == "y" else 2
+        return self.plane_buffers[plane][y // step][x // step]
+
+
+    def plane_buffer_setter(self, plane, x, y, value):
+        step = 1 if plane == "y" else 2
+        self.plane_buffers[plane][y // step][x // step] = value
 
 
     def export_buffers(self, filename):
@@ -30,5 +53,5 @@ class VFrame:
 
 
     def export_image(self, filename):
-        test_image = frame_convert.convert_frame_to_image(self.plane_buffers)
+        test_image = vframe_convert.convert_frame_to_image(self.plane_buffers)
         test_image.save(filename)
