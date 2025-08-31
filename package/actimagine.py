@@ -19,7 +19,22 @@ quant4x4_tab = [
 
 class ActImagine:
     def __init__(self):
-        pass
+        self.file_signature = None
+        self.frames_qty = None
+        self.frame_width = None
+        self.frame_height = None
+        self.frame_rate = None
+        self.quantizer = None
+        self.audio_sample_rate = None
+        self.audio_streams_qty = None
+        self.frame_size_max = None
+        self.audio_extradata_offset = None
+        self.seek_table_offset = None
+        self.seek_table_entries_qty = None
+        self.audio_extradata = None
+        self.seek_table = None
+        self.qtab = None
+        self.avframes = None
 
 
     def load_vx(self, data):
@@ -86,15 +101,18 @@ class ActImagine:
 
         self.avframes = []
         ref_vframes = [None, None, None]
+        prev_aframe = None
         for i in range(self.frames_qty):
             avframe = AVFrame()
             frame_data_size = reader.int_from_bytes(2)
             aframes_qty = reader.int_from_bytes(2)
             avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
-            avframe.init_aframes(aframes_qty, self.audio_extradata)
+            avframe.init_aframes(aframes_qty, self.audio_extradata, prev_aframe)
             avframe.set_data(np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte))
             self.avframes.append(avframe)
             ref_vframes = [avframe.vframe] + ref_vframes[:-1]
+            if aframes_qty > 0:
+                prev_aframe = avframe.aframes[aframes_qty-1]
 
 
     # generate images and audio from vx data
@@ -104,8 +122,8 @@ class ActImagine:
         for avframe in self.avframes:
             avframe.decode()
             avframe.vframe.export_image("frame{:04d}.png".format(self.frame_number))
-            audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
             print(avframe.get_audio_samples())
+            audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
             print(audio_s)
             audio_samples = np.concatenate((audio_samples, audio_s), axis=0)
             """with wave.open("frame{:04d}.wav".format(self.frame_number), "w") as f:
@@ -116,10 +134,10 @@ class ActImagine:
                 f.writeframes(audio_s.tobytes())"""
             self.frame_number += 1
         audio_samples /= np.max(np.abs(audio_samples), axis=0)
-        """with wave.open("fullaudio.wav", "w") as f:
+        with wave.open("fullaudio.wav", "w") as f:
             f.setnchannels(1)
             f.setsampwidth(4)
             f.setframerate(self.audio_sample_rate)
-            f.writeframes(audio_samples.tobytes())"""
+            f.writeframes(audio_samples.tobytes())
 
 

@@ -23,10 +23,12 @@ class AVFrame:
         self.vframe = VFrame(vframe_width, vframe_height, ref_vframes, qtab)
 
 
-    def init_aframes(self, qty, audio_extradata):
+    def init_aframes(self, qty, audio_extradata, prev_aframe):
         self.aframes = []
         for i in range(qty):
-            self.aframes.append(AFrame(audio_extradata))
+            aframe = AFrame(audio_extradata, prev_aframe)
+            self.aframes.append(aframe)
+            prev_aframe = aframe
 
 
     def decode(self):

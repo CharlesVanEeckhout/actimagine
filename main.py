@@ -17,9 +17,9 @@ def main():
     with open(args.filename, "rb") as f:
         data = f.read()
     act.load_vx(data)
-    #act.interpret_vx()
+    act.interpret_vx()
 
-    act.avframes[0].decode()
+    """act.avframes[0].decode()
     act.avframes[0].vframe.export_image("frame_0001.png")
     with Image.open("frame_0001.png") as im:
         im_width, im_height = im.size
@@ -31,7 +31,7 @@ def main():
     data_bytes = writer.get_data_bytes()
     reader.set_data_bytes([byte for i in range(0, len(data_bytes)-1, 2) for byte in reversed(data_bytes[i:i+2])], bitorder="big")
     vframe.decode(reader)
-    vframe.export_image("frame_0001_codec.png")
+    vframe.export_image("frame_0001_codec.png")"""
 
 
 if __name__ == "__main__":
