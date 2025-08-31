@@ -1,9 +1,12 @@
 import numpy as np
-
+import logging
 
 from . import vlc
 from . import h264pred
 from .frame_includes import *
+
+logger = logging.getLogger(__name__)
+logger.propagate = True # enable/disable
 
 
 class VFrameDecoder:
@@ -26,7 +29,7 @@ class VFrameDecoder:
 
     def predict_inter(self, block, pred_vec, has_delta, ref_vframe):
         if ref_vframe is None:
-            raise Exception("ref_vframe was None")
+            raise RuntimeError("ref_vframe was None")
 
         vec = pred_vec.copy()
         if has_delta:
@@ -35,7 +38,7 @@ class VFrameDecoder:
 
         if block["x"] + vec["x"] < 0 or block["x"] + vec["x"] + block["w"] > self.vframe.width or \
             block["y"] + vec["y"] < 0 or block["y"] + vec["y"] + block["h"] > self.vframe.height:
-            raise Exception("motion vector moves block out of bounds")
+            raise RuntimeError("motion vector moves block out of bounds")
 
         self.vectors[(block["y"] // 16) + 1][(block["x"] // 16) + 1] = vec
 
@@ -55,22 +58,22 @@ class VFrameDecoder:
 
         if block["x"] + vec["x"] < 0 or block["x"] + vec["x"] + block["w"] > self.vframe.width or \
             block["y"] + vec["y"] < 0 or block["y"] + vec["y"] + block["h"] > self.vframe.height:
-            raise Exception("motion vector out of bounds")
+            raise RuntimeError("motion vector out of bounds")
 
         dc = {}
         dc["y"] = self.reader.signed_expgolomb()
         if dc["y"] < -(1 << 16) or dc["y"] >= (1 << 16):
-            raise Exception("invalid dc offset")
+            raise RuntimeError("invalid dc offset")
         dc["y"] *= 2
 
         dc["u"] = self.reader.signed_expgolomb()
         if dc["u"] < -(1 << 16) or dc["u"] >= (1 << 16):
-            raise Exception("invalid dc offset")
+            raise RuntimeError("invalid dc offset")
         dc["u"] *= 2
 
         dc["v"] = self.reader.signed_expgolomb()
         if dc["v"] < -(1 << 16) or dc["v"] >= (1 << 16):
-            raise Exception("invalid dc offset")
+            raise RuntimeError("invalid dc offset")
         dc["v"] *= 2
 
         def predict_inter_dc_callback(x, y, plane):
@@ -83,7 +86,7 @@ class VFrameDecoder:
 
     def predict_notile(self, block):
         mode = self.reader.unsigned_expgolomb()
-        print("predict notile " + str(mode))
+        logger.debug("predict notile " + str(mode))
         if mode == 0:
             self.predict_vertical(block, "y")
         elif mode == 1:
@@ -93,13 +96,13 @@ class VFrameDecoder:
         elif mode == 3:
             self.predict_plane(block, "y", 0)
         else:
-            raise Exception("invalid predict notile mode " + str(mode))
+            raise RuntimeError("invalid predict notile mode " + str(mode))
         self.predict_notile_uv(block)
 
 
     def predict_notile_uv(self, block):
         mode = self.reader.unsigned_expgolomb()
-        print("predict notile uv " + str(mode))
+        logger.debug("predict notile uv " + str(mode))
         if mode == 0:
             self.predict_dc(block, "u")
             self.predict_dc(block, "v")
@@ -113,7 +116,7 @@ class VFrameDecoder:
             self.predict_plane(block, "u", 0)
             self.predict_plane(block, "v", 0)
         else:
-            raise Exception("invalid predict notile uv mode " + str(mode))
+            raise RuntimeError("invalid predict notile uv mode " + str(mode))
 
 
     def predict4(self, block):
@@ -166,7 +169,7 @@ class VFrameDecoder:
                 elif mode == 8: # horizontal-up
                     h264pred.pred4x4_horizontal_up(self.vframe.plane_buffers["y"], dst)
                 else:
-                    raise Exception("invalid predict4 mode " + str(mode))
+                    raise RuntimeError("invalid predict4 mode " + str(mode))
 
         self.predict_notile_uv(block)
 
@@ -228,11 +231,11 @@ class VFrameDecoder:
     def predict_plane(self, block, plane, param):
         bottom_left = self.vframe.plane_buffer_getter(plane, block["x"]-1, block["y"]+block["h"]-1)
         top_right = self.vframe.plane_buffer_getter(plane, block["x"]+block["w"]-1, block["y"]-1)
-        print("plane bottom_left: " + str(bottom_left))
-        print("plane top_right: " + str(top_right))
-        print("plane param: " + str(param))
+        logger.debug("plane bottom_left: " + str(bottom_left))
+        logger.debug("plane top_right: " + str(top_right))
+        logger.debug("plane param: " + str(param))
         pixel = (bottom_left + top_right + 1) // 2 + param
-        print("plane px: " + str(pixel))
+        logger.debug("plane px: " + str(pixel))
         self.vframe.plane_buffer_setter(plane, block["x"]+block["w"]-1, block["y"]+block["h"]-1, pixel)
 
         def predict_plane_intern(block, plane):
@@ -281,22 +284,22 @@ class VFrameDecoder:
         # y
         param = self.reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
-            raise Exception("invalid plane param " + str(param))
-        print("mbplane y param: " + str(param))
+            raise RuntimeError("invalid plane param " + str(param))
+        logger.debug("mbplane y param: " + str(param))
         self.predict_plane(block, "y", param * 2)
 
         # u
         param = self.reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
-            raise Exception("invalid plane param " + str(param))
-        print("mbplane u param: " + str(param))
+            raise RuntimeError("invalid plane param " + str(param))
+        logger.debug("mbplane u param: " + str(param))
         self.predict_plane(block, "u", param * 2)
 
         # v
         param = self.reader.signed_expgolomb()
         if param < -(1 << 16) or param >= (1 << 16):
-            raise Exception("invalid plane param " + str(param))
-        print("mbplane v param: " + str(param))
+            raise RuntimeError("invalid plane param " + str(param))
+        logger.debug("mbplane v param: " + str(param))
         self.predict_plane(block, "v", param * 2)
 
 
@@ -306,16 +309,16 @@ class VFrameDecoder:
             for x in range(0, block["w"], 8):
                 residu_mask_tab_index = self.reader.unsigned_expgolomb()
                 if residu_mask_tab_index > 0x1F:
-                    raise Exception("invalid residu mask tab index " + str(residu_mask_tab_index))
+                    raise RuntimeError("invalid residu mask tab index " + str(residu_mask_tab_index))
                 residu_mask = ff_actimagine_vx_residu_mask_new_tab[residu_mask_tab_index]
-                print("residu block (" + str(x) + ", " + str(y) + ") mask " + "{:05b}".format(residu_mask))
+                logger.debug("residu block (" + str(x) + ", " + str(y) + ") mask " + "{:05b}".format(residu_mask))
 
                 if residu_mask & 1 != 0:
                     coeff_left = self.coeff_buffer_getter("y", block["x"]+x  -1, block["y"]+y    )
                     coeff_top  = self.coeff_buffer_getter("y", block["x"]+x    , block["y"]+y  -1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(block["x"]+x  , block["y"]+y  , nc, "y")
-                    print("out_total_coeff bit0: " + str(out_total_coeff))
+                    logger.debug("out_total_coeff bit0: " + str(out_total_coeff))
                     self.coeff_buffer_setter("y", block["x"]+x  , block["y"]+y  , out_total_coeff)
                 else:
                     self.coeff_buffer_setter("y", block["x"]+x  , block["y"]+y  , 0)
@@ -325,7 +328,7 @@ class VFrameDecoder:
                     coeff_top  = self.coeff_buffer_getter("y", block["x"]+x+4  , block["y"]+y  -1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(block["x"]+x+4, block["y"]+y  , nc, "y")
-                    print("out_total_coeff bit1: " + str(out_total_coeff))
+                    logger.debug("out_total_coeff bit1: " + str(out_total_coeff))
                     self.coeff_buffer_setter("y", block["x"]+x+4, block["y"]+y  , out_total_coeff)
                 else:
                     self.coeff_buffer_setter("y", block["x"]+x+4, block["y"]+y  , 0)
@@ -335,7 +338,7 @@ class VFrameDecoder:
                     coeff_top  = self.coeff_buffer_getter("y", block["x"]+x    , block["y"]+y+4-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(block["x"]+x  , block["y"]+y+4, nc, "y")
-                    print("out_total_coeff bit2: " + str(out_total_coeff))
+                    logger.debug("out_total_coeff bit2: " + str(out_total_coeff))
                     self.coeff_buffer_setter("y", block["x"]+x  , block["y"]+y+4, out_total_coeff)
                 else:
                     self.coeff_buffer_setter("y", block["x"]+x  , block["y"]+y+4, 0)
@@ -345,7 +348,7 @@ class VFrameDecoder:
                     coeff_top  = self.coeff_buffer_getter("y", block["x"]+x+4  , block["y"]+y+4-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
                     out_total_coeff = self.decode_residu_cavlc(block["x"]+x+4, block["y"]+y+4, nc, "y")
-                    print("out_total_coeff bit3: " + str(out_total_coeff))
+                    logger.debug("out_total_coeff bit3: " + str(out_total_coeff))
                     self.coeff_buffer_setter("y", block["x"]+x+4, block["y"]+y+4, out_total_coeff)
                 else:
                     self.coeff_buffer_setter("y", block["x"]+x+4, block["y"]+y+4, 0)
@@ -354,11 +357,11 @@ class VFrameDecoder:
                     coeff_left = self.coeff_buffer_getter("uv", block["x"]+x-1, block["y"]+y  )
                     coeff_top  = self.coeff_buffer_getter("uv", block["x"]+x  , block["y"]+y-1)
                     nc = int((coeff_left + coeff_top + 1) // 2)
-                    print("nc: " + str(nc))
+                    logger.debug("nc: " + str(nc))
                     out_total_coeff_u = self.decode_residu_cavlc(block["x"]+x, block["y"]+y, nc, "u")
                     out_total_coeff_v = self.decode_residu_cavlc(block["x"]+x, block["y"]+y, nc, "v")
                     out_total_coeff = int((out_total_coeff_u + out_total_coeff_v + 1) // 2)
-                    print("out_total_coeff bit4: " + str(out_total_coeff))
+                    logger.debug("out_total_coeff bit4: " + str(out_total_coeff))
                     self.coeff_buffer_setter("uv", block["x"]+x, block["y"]+y, out_total_coeff)
                 else:
                     self.coeff_buffer_setter("uv", block["x"]+x, block["y"]+y, 0)
@@ -366,9 +369,9 @@ class VFrameDecoder:
 
     def decode_residu_cavlc(self, x, y, nc, plane):
         coeff_token = self.reader.vlc2(vlc.coeff_token_vlc[ff_h264_cavlc_coeff_token_table_index[nc]])
-        print("coeff_token: " + str(coeff_token))
+        logger.debug("coeff_token: " + str(coeff_token))
         if coeff_token == -1:
-            raise Exception("invalid vlc")
+            raise RuntimeError("invalid vlc")
 
         trailing_ones = coeff_token & 3
         total_coeff   = coeff_token >> 2
@@ -381,7 +384,7 @@ class VFrameDecoder:
             zeros_left = 0
         else:
             zeros_left = self.reader.vlc2(vlc.total_zeros_vlc[total_coeff])
-            print("zeros_left: " + str(zeros_left))
+            logger.debug("zeros_left: " + str(zeros_left))
             for i in range(16 - (total_coeff + zeros_left)):
                 level.insert(0, 0)
 
@@ -427,7 +430,7 @@ class VFrameDecoder:
         for i in range(zeros_left):
             level.insert(0, 0)
 
-        print(level)
+        logger.debug(level)
 
         self.decode_dct(x, y, plane, level)
         return out_total_coeff
@@ -487,12 +490,12 @@ class VFrameDecoder:
 
 
     def decode_mb(self, block, pred_vec):
-        print(block)
+        logger.debug(block)
         mode = self.reader.unsigned_expgolomb()
-        print(mode)
+        logger.debug(mode)
         if mode == 0: # v-split, no residu
             if block["w"] == 2:
-                raise Exception("cannot v-split block further")
+                raise RuntimeError("cannot v-split block further")
             self.decode_mb(block_half_left(block), pred_vec)
             self.decode_mb(block_half_right(block), pred_vec)
             if block["w"] == 8 and block["h"] >= 8:
@@ -503,7 +506,7 @@ class VFrameDecoder:
                 self.clear_total_coeff(block)
         elif mode == 2: # h-split, no residu
             if block["h"] == 2:
-                raise Exception("cannot h-split block further")
+                raise RuntimeError("cannot h-split block further")
             self.decode_mb(block_half_up(block), pred_vec)
             self.decode_mb(block_half_down(block), pred_vec)
             if block["w"] >= 8 and block["h"] == 8:
@@ -530,7 +533,7 @@ class VFrameDecoder:
                 self.clear_total_coeff(block)
         elif mode == 8: # v-split, residu
             if block["w"] == 2:
-                raise Exception("cannot v-split block further")
+                raise RuntimeError("cannot v-split block further")
             self.decode_mb(block_half_left(block), pred_vec)
             self.decode_mb(block_half_right(block), pred_vec)
             self.decode_residu_blocks(block)
@@ -550,7 +553,7 @@ class VFrameDecoder:
             self.decode_residu_blocks(block)
         elif mode == 13: # h-split, residu
             if block["h"] == 2:
-                raise Exception("cannot h-split block further")
+                raise RuntimeError("cannot h-split block further")
             self.decode_mb(block_half_up(block), pred_vec)
             self.decode_mb(block_half_down(block), pred_vec)
             self.decode_residu_blocks(block)
@@ -587,7 +590,7 @@ class VFrameDecoder:
             self.predict_mb_plane(block)
             self.decode_residu_blocks(block)
         else:
-            raise Exception("frame block mode " + str(mode) + " is greater than 23")
+            raise RuntimeError("frame block mode " + str(mode) + " is greater than 23")
 
 
     def decode(self):
@@ -623,7 +626,7 @@ class VFrameDecoder:
                         self.vectors[(block["y"] // 16) + 0][(block["x"] // 16) + 2]["y"]
                     ),
                 }
-                print(block)
+                logger.debug(block)
                 self.decode_mb(block, pred_vec)
 
         # align with word

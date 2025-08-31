@@ -27,7 +27,7 @@ class DataReader:
 
     def bit(self):
         if self.offset + 1/8 > self.data_size:
-            raise Exception("tried to read out of bounds")
+            raise RuntimeError("tried to read out of bounds")
         bit_number = int(self.offset * 8) & 7
         bit = (self.data[int(self.offset)] >> bit_number) & 1
         self.offset += 1/8
@@ -41,7 +41,7 @@ class DataReader:
 
     def byte(self):
         if self.offset + 1 > self.data_size:
-            raise Exception("tried to read out of bounds")
+            raise RuntimeError("tried to read out of bounds")
         self.offset += 1
         if self.offset % 1 == 0:
             return self.data[self.offset-1]
@@ -66,7 +66,7 @@ class DataReader:
         if signed and value < 0:
             value += value_max
         if value < 0 or value >= value_max:
-            raise Exception("value is out of bounds")
+            raise RuntimeError("value is out of bounds")
         return value
 
     def int_from_bytes(self, byte_qty, byteorder="little", signed=False):
@@ -147,7 +147,7 @@ class BitStreamWriter:
         if signed and value < 0:
             value += value_max
         if value < 0 or value >= value_max:
-            raise Exception("value is out of bounds")
+            raise RuntimeError("value is out of bounds")
         out = []
         for i in range(length):
             out.append(value & 1)
@@ -158,7 +158,7 @@ class BitStreamWriter:
 
     def unsigned_expgolomb(self, value):
         if value < 0:
-            raise Exception("value is out of bounds")
+            raise RuntimeError("value is out of bounds")
         value += 1
         out = f"{value:b}"
         out = "0" * (len(out) - 1) + out
@@ -172,8 +172,7 @@ class BitStreamWriter:
 
     def vlc2(self, value, vlc):
         if value < 0 or value >= len(vlc.bit_strings):
-            raise Exception("value is out of bounds")
+            raise RuntimeError("value is out of bounds")
         bs = vlc.bit_strings[value]
         for b in bs:
             self.bit(int(b))
-

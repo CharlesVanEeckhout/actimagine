@@ -239,4 +239,3 @@ def pred4x4_horizontal_up(plane_buffer, dst):
     for y in range(4):
         for x in range(4):
             plane_buffer[dst["y"] + y][dst["x"] + x] = pixels[min(x + 2*y, 6)]
-

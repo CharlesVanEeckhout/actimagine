@@ -50,11 +50,11 @@ def convert_frame_to_image(frame):
 
 def convert_image_to_frame(image):
     if image.mode not in ["RGB", "RGBA"]:
-        raise Exception("image mode is not RGB")
+        raise RuntimeError("image mode is not RGB")
 
     frame_width, frame_height = image.size
     if frame_width % 2 != 0 or frame_height % 2 != 0:
-        raise Exception("image's resolution is not a multiple of 2")
+        raise RuntimeError("image's resolution is not a multiple of 2")
 
     frame = {
         "y": np.zeros((frame_height, frame_width), dtype=np.uint16),
@@ -76,4 +76,3 @@ def convert_image_to_frame(image):
             frame["v"][y//2][x//2] = round((yuv00[2] + yuv01[2] + yuv10[2] + yuv11[2]) / 4)
 
     return frame
-

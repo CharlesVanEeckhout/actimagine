@@ -1,7 +1,11 @@
 import numpy as np
+import logging
 
 from .. import vlc
 from ..frame_includes import *
+
+logger = logging.getLogger(__name__)
+logger.propagate = True # enable/disable
 
 
 class KeyframeOnlySimple:
@@ -25,8 +29,8 @@ class KeyframeOnlySimple:
 
     def predict_dc(self, block, plane):
         dc = 128
-        print("predict_dc")
-        print(block)
+        logger.debug("predict_dc")
+        logger.debug(block)
         if block["x"] != 0 and block["y"] != 0:
             # average of both averages below
             sum_x = block["w"] // 2
@@ -54,7 +58,7 @@ class KeyframeOnlySimple:
                 sum_y += self.vframe.plane_buffer_getter(plane, block["x"]-1, block["y"]+y)
 
             dc = sum_y // block["h"]
-        print(dc)
+        logger.debug(dc)
         def predict_dc_callback(x, y, plane):
             self.vframe.plane_buffer_setter(plane, x, y, dc)
 
@@ -128,7 +132,7 @@ class KeyframeOnlySimple:
                 break
             level.pop(i)
 
-        print(level)
+        logger.debug(level)
 
         if len(level) == 0:
             # encode empty residu
@@ -151,9 +155,9 @@ class KeyframeOnlySimple:
                 run_before_zeros.append(run_before_current_zero)
                 run_before_current_zero = 0
 
-        print("run_before_zeros: " + str(run_before_zeros))
-        print("zeros_left: " + str(zeros_left))
-        print(level)
+        logger.debug("run_before_zeros: " + str(run_before_zeros))
+        logger.debug("zeros_left: " + str(zeros_left))
+        logger.debug(level)
 
         # trailing one coefficients
         total_coeff = len(level)
@@ -170,8 +174,8 @@ class KeyframeOnlySimple:
                 break
         trailing_ones = len(trailing_ones_signbits)
         coeff_token = (total_coeff << 2) + trailing_ones
-        print("trailing_ones: " + str(trailing_ones))
-        print(level)
+        logger.debug("trailing_ones: " + str(trailing_ones))
+        logger.debug(level)
 
         # non trailing one coefficients
         suffix_length = 0
@@ -187,20 +191,20 @@ class KeyframeOnlySimple:
             level_suffix = level[i] - (level_prefix << suffix_length)
             real_suffix_length = 11 if level_prefix == 15 else suffix_length
             if level_suffix >= (1 << real_suffix_length):
-                raise Exception("level_suffix too large")
+                raise RuntimeError("level_suffix too large")
             level_prefixes.append(level_prefix)
             level_suffixes.append(level_suffix)
             real_suffix_lengths.append(real_suffix_length)
 
-            print("level_code " + str(level_code) + " vs suffix limit "+ str(ff_h264_cavlc_suffix_limit[suffix_length + 1]))
+            logger.debug("level_code " + str(level_code) + " vs suffix limit "+ str(ff_h264_cavlc_suffix_limit[suffix_length + 1]))
             suffix_length += 1 if abs(level_code) > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
 
             level.pop(i)
 
-        print("level_code_signbits: " + str(level_code_signbits))
-        print("level_prefixes:      " + str(level_prefixes))
-        print("level_suffixes:      " + str(level_suffixes))
-        print("real_suffix_lengths: " + str(real_suffix_lengths))
+        logger.debug("level_code_signbits: " + str(level_code_signbits))
+        logger.debug("level_prefixes:      " + str(level_prefixes))
+        logger.debug("level_suffixes:      " + str(level_suffixes))
+        logger.debug("real_suffix_lengths: " + str(real_suffix_lengths))
 
         # encode level
 
@@ -234,8 +238,8 @@ class KeyframeOnlySimple:
 
             run_before = run_before_zeros.pop(0)
 
-            print("zeros_left: " + str(zeros_left))
-            print("run_before: " + str(run_before))
+            logger.debug("zeros_left: " + str(zeros_left))
+            logger.debug("run_before: " + str(run_before))
             if zeros_left < 7:
                 self.writer.vlc2(run_before, vlc.run_vlc[zeros_left])
             else:
@@ -255,7 +259,7 @@ class KeyframeOnlySimple:
                     int(self.goal_plane_buffers[plane][yy][xx]) -
                     int(self.vframe.plane_buffers[plane][yy][xx])
                 )
-            print(row)
+            logger.debug(row)
             goal_residu.append(row)
 
         # average of goal_residu times filter
@@ -271,7 +275,7 @@ class KeyframeOnlySimple:
         level = []
         for i in range(16):
             level.append(round(averages[zigzag_scan[i]]))
-        print(level)
+        logger.debug(level)
         return level
 
 
@@ -369,4 +373,3 @@ class KeyframeOnlySimple:
         # align with word
         while self.writer.bit_number != 15:
             self.writer.bit(0)
-

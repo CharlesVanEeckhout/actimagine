@@ -2,9 +2,13 @@
 
 import numpy as np
 import wave
+import logging
 
 from .avframe import AVFrame
 from . import io
+
+logger = logging.getLogger(__name__)
+logger.propagate = True # enable/disable
 
 
 quant4x4_tab = [
@@ -56,7 +60,7 @@ class ActImagine:
         self.seek_table_entries_qty = reader.int_from_bytes(4)
 
         if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
-            raise Exception("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
+            raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
 
 
         self.audio_extradata = {}
@@ -93,7 +97,7 @@ class ActImagine:
 
 
         if self.quantizer < 12 or self.quantizer > 161:
-            raise Exception("quantizer " + str(self.quantizer) + " was out of bounds")
+            raise RuntimeError("quantizer " + str(self.quantizer) + " was out of bounds")
         qx = self.quantizer % 6
         qy = self.quantizer // 6
         self.qtab = [i << qy for i in quant4x4_tab[qx]]
@@ -122,9 +126,9 @@ class ActImagine:
         for avframe in self.avframes:
             avframe.decode()
             avframe.vframe.export_image("frame{:04d}.png".format(self.frame_number))
-            print(avframe.get_audio_samples())
+            logger.debug(avframe.get_audio_samples())
             audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
-            print(audio_s)
+            logger.debug(audio_s)
             audio_samples = np.concatenate((audio_samples, audio_s), axis=0)
             """with wave.open("frame{:04d}.wav".format(self.frame_number), "w") as f:
                 f.setnchannels(1)
@@ -139,5 +143,3 @@ class ActImagine:
             f.setsampwidth(4)
             f.setframerate(self.audio_sample_rate)
             f.writeframes(audio_samples.tobytes())
-
-

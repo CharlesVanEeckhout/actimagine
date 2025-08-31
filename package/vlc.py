@@ -149,4 +149,3 @@ run_vlc = []
 for (l, b) in zip(run_len, run_bits, strict=True):
     run_vlc.append(VLC(l, b))
 run7_vlc = VLC(run7_len, run7_bits)
-

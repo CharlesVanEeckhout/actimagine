@@ -1,5 +1,6 @@
 import argparse
 from PIL import Image
+import logging
 
 from package.actimagine import ActImagine
 from package.vframe import VFrame
@@ -9,6 +10,7 @@ from package.vframe_convert import convert_image_to_frame
 
 
 def main():
+    logging.basicConfig(filename='main.log', level=logging.INFO)
     parser = argparse.ArgumentParser()
     parser.add_argument('filename')
     args = parser.parse_args()

@@ -1,6 +1,7 @@
 
 from .aframe_decoder import AFrameDecoder
 
+
 class AFrame:
     def __init__(self, audio_extradata, prev_aframe):
         self.samples = None
@@ -16,4 +17,4 @@ class AFrame:
 
 
     def encode(self, writer):
-        pass
+        raise NotImplementedError()

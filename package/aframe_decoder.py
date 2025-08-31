@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+logger.propagate = True # enable/disable
 
 
 class AFrameDecoder:
@@ -62,7 +66,7 @@ class AFrameDecoder:
         if self.prev_frame_offset != 0x7f:
             # inter frame
             if self.aframe.prev_aframe is None:
-                raise Exception("inter aframe has no previous aframe")
+                raise RuntimeError("inter aframe has no previous aframe")
             self.aframe.lpc_filter = self.aframe.prev_aframe.lpc_filter.copy()
         
         lpc_filter_difference = []
@@ -71,9 +75,9 @@ class AFrameDecoder:
             for i in range(3):
                 coeff_sum += self.aframe.audio_extradata["lpc_codebooks"][i][self.lpc_codebook_indexes[i]][k]
             lpc_filter_difference.append(coeff_sum)
-        print(lpc_filter_difference)
-        print(self.pulse_start_position)
-        print(self.prev_frame_offset)
+        logger.debug(lpc_filter_difference)
+        logger.debug(self.pulse_start_position)
+        logger.debug(self.prev_frame_offset)
 
         self.lpc_filter_quarters = [[], [], [], []]
         if self.prev_frame_offset != 0x7f:
