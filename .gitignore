@@ -1,6 +1,8 @@
 *.vx
+*.vxnew
 *.pyc
 *.png
 *.bin
 *.wav
+*.json
 *.log

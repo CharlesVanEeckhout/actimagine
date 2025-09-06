@@ -1,11 +1,14 @@
 # code adapted from https://lists.ffmpeg.org/pipermail/ffmpeg-devel/2021-March/277989.html
 
+import os
 import numpy as np
 import wave
+import json
+from PIL import Image
 import logging
-import os
 
 from .avframe import AVFrame
+from .vframe_convert import convert_image_to_frame
 from . import io
 
 logger = logging.getLogger(__name__)
@@ -174,7 +177,7 @@ class ActImagine:
 
 
     def save_vx(self):
-        data_audio_extradata = []
+        data_audio_extradata = bytearray()
         
         for codebook in self.audio_extradata["lpc_codebooks"]:
             for lpc_filter_part in codebook:
@@ -189,7 +192,7 @@ class ActImagine:
         
         data_audio_extradata += (self.audio_extradata["scale_initial"]).to_bytes(4, byteorder="little")
         
-        data_seek_table = []
+        data_seek_table = bytearray()
         
         self.seek_table_entries_qty = 0
         for entry in self.seek_table:
@@ -197,20 +200,22 @@ class ActImagine:
             data_seek_table += (entry["frame_offset"]).to_bytes(4, byteorder="little")
             self.seek_table_entries_qty += 1
         
-        data_avframes = []
+        data_avframes = bytearray()
         
+        self.frames_qty = 0
         self.frame_data_size_max = 0
         for avframe in self.avframes:
             frame_data_size = len(avframe.data) + 2
-            self.frame_data_size_max = max(frame_data_size, self.frame_data_size_max)
-            data_seek_table += (frame_data_size).to_bytes(2, byteorder="little")
-            data_seek_table += (len(avframe.aframes)).to_bytes(2, byteorder="little")
+            self.frame_data_size_max = max(frame_data_size + 2, self.frame_data_size_max)
+            data_avframes += (frame_data_size).to_bytes(2, byteorder="little")
+            data_avframes += (len(avframe.aframes)).to_bytes(2, byteorder="little")
             data_avframes += avframe.data
+            self.frames_qty += 1
         
         self.audio_extradata_offset = 12*4 + len(data_avframes)
         self.seek_table_offset = 12*4 + len(data_avframes) + len(data_audio_extradata)
         
-        data_header = []
+        data_header = bytearray()
         
         data_header += self.file_signature
         data_header += (self.frames_qty).to_bytes(4, byteorder="little")
@@ -231,11 +236,68 @@ class ActImagine:
         return data
 
 
+    def get_properties(self):
+        properties = {
+            "file_signature": list(self.file_signature),
+            "frame_rate": self.frame_rate,
+            "quantizer": self.quantizer,
+            "audio_sample_rate": self.audio_sample_rate,
+            "audio_streams_qty": self.audio_streams_qty,
+            "audio_extradata": self.audio_extradata,
+            "seek_table": self.seek_table,
+        }
+        return properties
+    
+
+    def set_properties(self, properties):
+        self.file_signature = bytearray(properties["file_signature"])
+        self.frame_rate = properties["frame_rate"]
+        self.quantizer = properties["quantizer"]
+        self.audio_sample_rate = properties["audio_sample_rate"]
+        self.audio_streams_qty = properties["audio_streams_qty"]
+        self.audio_extradata = properties["audio_extradata"]
+        self.seek_table = properties["seek_table"]
+
+
     def export_vxfolder(self, folder_path):
         if not os.path.isdir(folder_path):
             os.mkdir(folder_path)
+        properties = self.get_properties()
+        print(properties)
+        properties_jsonstr = json.dumps(properties)
+        with open(os.path.join(folder_path, "properties.json"), "w") as f:
+            f.write(properties_jsonstr)
         return ActImagine_ExportVXFolderIterator(self.avframes, self.audio_sample_rate, folder_path)
 
 
     def import_vxfolder(self, folder_path):
-        pass
+        with open(os.path.join(folder_path, "properties.json"), "r") as f:
+            properties_jsonstr = f.read()
+        properties = json.loads(properties_jsonstr)
+        self.set_properties(properties)
+        self.audio_streams_qty = 0 # audio is not supported yet
+        self.frames_qty = 0
+        self.frame_width = None
+        self.frame_height = None
+        self.avframes = []
+        ref_vframes = [None, None, None]
+        while True:
+            filename = os.path.join(self.folder_path, f"frame{self.frames_qty+1:04d}.png")
+            if not os.path.isfile(filename):
+                break
+            image = Image.open(filename)
+            if self.frame_width is None or self.frame_height is None:
+                self.frame_width, self.frame_height = image.size
+                if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
+                    raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
+            elif (self.frame_width, self.frame_height) != image.size:
+                raise RuntimeError(f"dimensions of frame {self.frames_qty+1} ({image.size[0]}x{image.size[1]}px) " + 
+                                   f"are not the same as those of the first frame ({self.frame_width}x{self.frame_height}px)")
+            avframe = AVFrame()
+            avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
+            avframe.init_aframes(0, self.audio_extradata, None)
+            avframe.vframe.plane_buffers = convert_image_to_frame(image)
+            ref_vframes = [avframe.vframe] + ref_vframes[:-1]
+            self.frames_qty += 1
+
+            
