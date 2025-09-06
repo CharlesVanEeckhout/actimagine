@@ -3,6 +3,7 @@
 import numpy as np
 import wave
 import logging
+import os
 
 from .avframe import AVFrame
 from . import io
@@ -21,6 +22,57 @@ quant4x4_tab = [
 ]
 
 
+
+class ActImagine_LoadVXIterator:
+    def __init__(self, avframes):
+        self.avframes = avframes.copy()
+
+
+    def __iter__(self):
+        return self
+
+
+    def __next__(self):
+        if len(self.avframes) == 0:
+            raise StopIteration
+        avframe = self.avframes.pop(0)
+        avframe.decode()
+
+
+
+class ActImagine_ExportVXFolderIterator:
+    def __init__(self, avframes, audio_sample_rate, folder_path):
+        self.avframes = avframes.copy()
+        self.audio_sample_rate = audio_sample_rate
+        self.folder_path = folder_path
+        self.audio_samples = np.array([], dtype=np.float32)
+        self.frame_number = 1
+
+
+    def __iter__(self):
+        return self
+
+
+    def __next__(self):
+        if len(self.avframes) == 0:
+            # todo: when audio decode is complete, remove volume amplify
+            self.audio_samples /= np.max(np.abs(self.audio_samples), axis=0)
+            with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
+                f.setnchannels(1)
+                f.setsampwidth(4)
+                f.setframerate(self.audio_sample_rate)
+                f.writeframes(self.audio_samples.tobytes())
+            raise StopIteration
+        avframe = self.avframes.pop(0)
+        avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))
+        logger.debug(avframe.get_audio_samples())
+        audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
+        logger.debug(audio_s)
+        self.audio_samples = np.concatenate((self.audio_samples, audio_s), axis=0)
+        self.frame_number += 1
+
+
+
 class ActImagine:
     def __init__(self):
         self.file_signature = None
@@ -31,7 +83,7 @@ class ActImagine:
         self.quantizer = None
         self.audio_sample_rate = None
         self.audio_streams_qty = None
-        self.frame_size_max = None
+        self.frame_data_size_max = None
         self.audio_extradata_offset = None
         self.seek_table_offset = None
         self.seek_table_entries_qty = None
@@ -54,7 +106,7 @@ class ActImagine:
         self.quantizer = reader.int_from_bytes(4)
         self.audio_sample_rate = reader.int_from_bytes(4)
         self.audio_streams_qty = reader.int_from_bytes(4)
-        self.frame_size_max = reader.int_from_bytes(4)
+        self.frame_data_size_max = reader.int_from_bytes(4)
         self.audio_extradata_offset = reader.int_from_bytes(4)
         self.seek_table_offset = reader.int_from_bytes(4)
         self.seek_table_entries_qty = reader.int_from_bytes(4)
@@ -118,28 +170,72 @@ class ActImagine:
             if aframes_qty > 0:
                 prev_aframe = avframe.aframes[aframes_qty-1]
 
+        return ActImagine_LoadVXIterator(self.avframes)
 
-    # generate images and audio from vx data
-    def interpret_vx(self):
-        self.frame_number = 1
-        audio_samples = np.array([], dtype=np.float32)
+
+    def save_vx(self):
+        data_audio_extradata = []
+        
+        for codebook in self.audio_extradata["lpc_codebooks"]:
+            for lpc_filter_part in codebook:
+                for value in lpc_filter_part:
+                    data_audio_extradata += (value).to_bytes(2, byteorder="little", signed=True)
+        
+        for scale_modifier in self.audio_extradata["scale_modifiers"]:
+            data_audio_extradata += (scale_modifier).to_bytes(2, byteorder="little")
+        
+        for value in self.audio_extradata["lpc_base"]:
+            data_audio_extradata += (value).to_bytes(4, byteorder="little", signed=True)
+        
+        data_audio_extradata += (self.audio_extradata["scale_initial"]).to_bytes(4, byteorder="little")
+        
+        data_seek_table = []
+        
+        self.seek_table_entries_qty = 0
+        for entry in self.seek_table:
+            data_seek_table += (entry["frame_id"]).to_bytes(4, byteorder="little")
+            data_seek_table += (entry["frame_offset"]).to_bytes(4, byteorder="little")
+            self.seek_table_entries_qty += 1
+        
+        data_avframes = []
+        
+        self.frame_data_size_max = 0
         for avframe in self.avframes:
-            avframe.decode()
-            avframe.vframe.export_image("frame{:04d}.png".format(self.frame_number))
-            logger.debug(avframe.get_audio_samples())
-            audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
-            logger.debug(audio_s)
-            audio_samples = np.concatenate((audio_samples, audio_s), axis=0)
-            """with wave.open("frame{:04d}.wav".format(self.frame_number), "w") as f:
-                f.setnchannels(1)
-                f.setsampwidth(4)
-                f.setframerate(self.audio_sample_rate)
-                # tobytes has the wrong endianness for a wav file
-                f.writeframes(audio_s.tobytes())"""
-            self.frame_number += 1
-        audio_samples /= np.max(np.abs(audio_samples), axis=0)
-        with wave.open("fullaudio.wav", "w") as f:
-            f.setnchannels(1)
-            f.setsampwidth(4)
-            f.setframerate(self.audio_sample_rate)
-            f.writeframes(audio_samples.tobytes())
+            frame_data_size = len(avframe.data) + 2
+            self.frame_data_size_max = max(frame_data_size, self.frame_data_size_max)
+            data_seek_table += (frame_data_size).to_bytes(2, byteorder="little")
+            data_seek_table += (len(avframe.aframes)).to_bytes(2, byteorder="little")
+            data_avframes += avframe.data
+        
+        self.audio_extradata_offset = 12*4 + len(data_avframes)
+        self.seek_table_offset = 12*4 + len(data_avframes) + len(data_audio_extradata)
+        
+        data_header = []
+        
+        data_header += self.file_signature
+        data_header += (self.frames_qty).to_bytes(4, byteorder="little")
+        data_header += (self.frame_width).to_bytes(4, byteorder="little")
+        data_header += (self.frame_height).to_bytes(4, byteorder="little")
+        data_header += (int(self.frame_rate * 0x10000)).to_bytes(4, byteorder="little")
+        data_header += (self.quantizer).to_bytes(4, byteorder="little")
+        data_header += (self.audio_sample_rate).to_bytes(4, byteorder="little")
+        data_header += (self.audio_streams_qty).to_bytes(4, byteorder="little")
+        data_header += (self.frame_data_size_max).to_bytes(4, byteorder="little")
+        data_header += (self.audio_extradata_offset).to_bytes(4, byteorder="little")
+        data_header += (self.seek_table_offset).to_bytes(4, byteorder="little")
+        data_header += (self.seek_table_entries_qty).to_bytes(4, byteorder="little")
+        
+        
+        data = data_header + data_avframes + data_audio_extradata + data_seek_table
+        
+        return data
+
+
+    def export_vxfolder(self, folder_path):
+        if not os.path.isdir(folder_path):
+            os.mkdir(folder_path)
+        return ActImagine_ExportVXFolderIterator(self.avframes, self.audio_sample_rate, folder_path)
+
+
+    def import_vxfolder(self, folder_path):
+        pass

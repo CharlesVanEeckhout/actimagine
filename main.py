@@ -18,8 +18,18 @@ def main():
     act = ActImagine()
     with open(args.filename, "rb") as f:
         data = f.read()
-    act.load_vx(data)
-    act.interpret_vx()
+    print(list(data[:48]))
+    load_vx_iter = act.load_vx(data)
+    """for i, _ in enumerate(load_vx_iter):
+        print(f"loading vx file: frame {i+1}/{act.frames_qty}")
+    print("loading vx file: complete")
+    export_vx_iter = act.export_vxfolder("vx_folder")
+    for i, _ in enumerate(export_vx_iter):
+        print(f"exporting vx content: frame {i+1}/{act.frames_qty}")
+    print("exporting vx content: complete")"""
+    data_new = act.save_vx()
+    with open(args.filename+"new", "wb") as f:
+        f.write(bytes(data_new))
 
     """act.avframes[0].decode()
     act.avframes[0].vframe.export_image("frame_0001.png")
