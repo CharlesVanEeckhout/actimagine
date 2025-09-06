@@ -16,7 +16,7 @@ class AVFrame:
 
 
     def set_data(self, data):
-        self.data = data
+        self.data = bytearray(data)
 
 
     def init_vframe(self, vframe_width, vframe_height, ref_vframes, qtab):

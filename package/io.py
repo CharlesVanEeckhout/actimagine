@@ -12,16 +12,16 @@ class DataReader:
             for i in range(len(data)):
                 data[i] = int((f"{data[i]:08b}")[::-1], 2)
         self.data_size = len(data)
-        self.data = data
+        self.data = bytearray(data)
 
     def set_data_bits(self, data):
         self.data_size = len(data) / 8
-        self.data = []
-        data = np.concatenate([data, np.zeros((-len(data)) & 7)]) # complete the byte
+        self.data = bytearray()
         for i in range(0, len(data), 8):
+            bits_available = min(8, len(data)-i)
             byte = 0
-            byte_bits = data[i:i+8]
-            for j in range(8):
+            byte_bits = data[i:i+bits_available]
+            for j in range(bits_available):
                 byte += int(byte_bits[j]) << j
             self.data.append(byte)
 
@@ -50,8 +50,8 @@ class DataReader:
         return byte
 
     def bytes(self, byte_qty):
-        bytes = []
-        for i in range(byte_qty):
+        bytes = bytearray()
+        for _ in range(byte_qty):
             bytes.append(self.byte())
         return bytes
 
@@ -104,19 +104,23 @@ class BitStreamWriter:
     # byte order of words is little endian
     # bit order per word is msb to lsb
     def __init__(self):
-        self.data = []
+        self.data = np.array([], dtype=np.uint16)
         self.bit_number = 15
 
+    def _data_append(self, word):
+        # contrary to np.append, np.insert preserves the array's dtype
+        self.data = np.insert(self.data, [len(self.data)], [word])
+
     def get_data_bytes(self):
-        bytes = []
+        """bytes = []
         for word in self.data:
             bytes.append(word & 0xff)
-            bytes.append(word >> 8)
-        return bytes
+            bytes.append(word >> 8)"""
+        return self.data.tobytes()
 
     def bit(self, value):
         if self.bit_number == 15:
-            self.data.append(value << 15)
+            self._data_append(value << 15)
         else:
             self.data[len(self.data)-1] += value << self.bit_number
         self.bit_number = (self.bit_number - 1) & 15
@@ -128,12 +132,12 @@ class BitStreamWriter:
     def byte(self, value):
         value = int((f"{value:08b}")[::-1], 2)
         if self.bit_number == 15:
-            self.data.append(value << 8)
+            self._data_append(value << 8)
         elif self.bit_number >= 7:
             self.data[len(self.data)-1] += (value << (self.bit_number - 7))
         else:
             self.data[len(self.data)-1] += (value >> (7 - self.bit_number))
-            self.data.append((value << (self.bit_number + 9)) & 0xffff)
+            self._data_append((value << (self.bit_number + 9)) & 0xffff)
 
     def bytes(self, data):
         for byte in data:
@@ -149,7 +153,7 @@ class BitStreamWriter:
         if value < 0 or value >= value_max:
             raise RuntimeError("value is out of bounds")
         out = []
-        for i in range(length):
+        for _ in range(length):
             out.append(value & 1)
             value = value // 2
         if bitorder == "little":

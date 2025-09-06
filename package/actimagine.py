@@ -164,7 +164,7 @@ class ActImagine:
             aframes_qty = reader.int_from_bytes(2)
             avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
             avframe.init_aframes(aframes_qty, self.audio_extradata, prev_aframe)
-            avframe.set_data(np.array(list(reader.bytes(frame_data_size-2)), dtype=np.ubyte))
+            avframe.set_data(reader.bytes(frame_data_size-2))
             self.avframes.append(avframe)
             ref_vframes = [avframe.vframe] + ref_vframes[:-1]
             if aframes_qty > 0:

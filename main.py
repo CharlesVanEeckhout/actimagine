@@ -9,29 +9,36 @@ from package.vframe_encoder_strategies.keyframeonly_simple import KeyframeOnlySi
 from package.vframe_convert import convert_image_to_frame
 
 
-def main():
-    logging.basicConfig(filename='main.log', level=logging.INFO)
-    parser = argparse.ArgumentParser()
-    parser.add_argument('filename')
-    args = parser.parse_args()
-
+def load_vx_and_export_vxfolder(args):
     act = ActImagine()
     with open(args.filename, "rb") as f:
         data = f.read()
-    print(list(data[:48]))
     load_vx_iter = act.load_vx(data)
-    """for i, _ in enumerate(load_vx_iter):
+    for i, _ in enumerate(load_vx_iter):
         print(f"loading vx file: frame {i+1}/{act.frames_qty}")
     print("loading vx file: complete")
     export_vx_iter = act.export_vxfolder("vx_folder")
     for i, _ in enumerate(export_vx_iter):
-        print(f"exporting vx content: frame {i+1}/{act.frames_qty}")
-    print("exporting vx content: complete")"""
+        print(f"exporting vx folder: frame {i+1}/{act.frames_qty}")
+    print("exporting vx folder: complete")
+
+
+def load_vx_and_save_vx(args):
+    act = ActImagine()
+    with open(args.filename, "rb") as f:
+        data = f.read()
+    act.load_vx(data)
     data_new = act.save_vx()
     with open(args.filename+"new", "wb") as f:
         f.write(bytes(data_new))
 
-    """act.avframes[0].decode()
+
+def reencode_first_frame(args):
+    act = ActImagine()
+    with open(args.filename, "rb") as f:
+        data = f.read()
+    act.load_vx(data)
+    act.avframes[0].decode()
     act.avframes[0].vframe.export_image("frame_0001.png")
     with Image.open("frame_0001.png") as im:
         im_width, im_height = im.size
@@ -43,7 +50,16 @@ def main():
     data_bytes = writer.get_data_bytes()
     reader.set_data_bytes([byte for i in range(0, len(data_bytes)-1, 2) for byte in reversed(data_bytes[i:i+2])], bitorder="big")
     vframe.decode(reader)
-    vframe.export_image("frame_0001_codec.png")"""
+    vframe.export_image("frame_0001_codec.png")
+
+
+def main():
+    logging.basicConfig(filename='main.log', level=logging.INFO)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename')
+    args = parser.parse_args()
+
+    load_vx_and_export_vxfolder(args)
 
 
 if __name__ == "__main__":
