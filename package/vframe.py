@@ -36,7 +36,7 @@ class VFrame:
 
     def plane_buffer_getter(self, plane, x, y):
         step = 1 if plane == "y" else 2
-        return self.plane_buffers[plane][y // step][x // step]
+        return int(self.plane_buffers[plane][y // step][x // step])
 
 
     def plane_buffer_setter(self, plane, x, y, value):
