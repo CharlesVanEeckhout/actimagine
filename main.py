@@ -23,6 +23,22 @@ def load_vx_and_export_vxfolder(args):
     print("exporting vx folder: complete")
 
 
+def import_vxfolder_and_save_vx(args):
+    act = ActImagine()
+    print("importing vx folder: start")
+    act.import_vxfolder("vx_folder")
+    print("importing vx folder: complete")
+    vframe_strategy = KeyframeOnlySimple()
+    for i, avframe in enumerate(act.avframes):
+        avframe.encode(avframe.vframe.plane_buffers, vframe_strategy)
+        print(f"encoding vx folder: frame {i+1}/{act.frames_qty}")
+    print("encoding vx folder: complete")
+    data_new = act.save_vx()
+    with open(args.filename+"new", "wb") as f:
+        f.write(bytes(data_new))
+    
+
+
 def load_vx_and_save_vx(args):
     act = ActImagine()
     with open(args.filename, "rb") as f:
@@ -59,7 +75,7 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
 
-    load_vx_and_export_vxfolder(args)
+    import_vxfolder_and_save_vx(args)
 
 
 if __name__ == "__main__":

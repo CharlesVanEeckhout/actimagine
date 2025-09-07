@@ -151,11 +151,7 @@ class ActImagine:
             })
 
 
-        if self.quantizer < 12 or self.quantizer > 161:
-            raise RuntimeError("quantizer " + str(self.quantizer) + " was out of bounds")
-        qx = self.quantizer % 6
-        qy = self.quantizer // 6
-        self.qtab = [i << qy for i in quant4x4_tab[qx]]
+        self.calculate_qtab()
 
 
         self.avframes = []
@@ -174,6 +170,14 @@ class ActImagine:
                 prev_aframe = avframe.aframes[aframes_qty-1]
 
         return ActImagine_LoadVXIterator(self.avframes)
+
+
+    def calculate_qtab(self):
+        if self.quantizer < 12 or self.quantizer > 161:
+            raise RuntimeError("quantizer " + str(self.quantizer) + " was out of bounds")
+        qx = self.quantizer % 6
+        qy = self.quantizer // 6
+        self.qtab = [i << qy for i in quant4x4_tab[qx]]
 
 
     def save_vx(self):
@@ -257,6 +261,7 @@ class ActImagine:
         self.audio_streams_qty = properties["audio_streams_qty"]
         self.audio_extradata = properties["audio_extradata"]
         self.seek_table = properties["seek_table"]
+        self.calculate_qtab()
 
 
     def export_vxfolder(self, folder_path):
@@ -282,9 +287,10 @@ class ActImagine:
         self.avframes = []
         ref_vframes = [None, None, None]
         while True:
-            filename = os.path.join(self.folder_path, f"frame{self.frames_qty+1:04d}.png")
+            filename = os.path.join(folder_path, f"frame{self.frames_qty+1:04d}.png")
             if not os.path.isfile(filename):
                 break
+            print(filename)
             image = Image.open(filename)
             if self.frame_width is None or self.frame_height is None:
                 self.frame_width, self.frame_height = image.size
@@ -294,6 +300,7 @@ class ActImagine:
                 raise RuntimeError(f"dimensions of frame {self.frames_qty+1} ({image.size[0]}x{image.size[1]}px) " + 
                                    f"are not the same as those of the first frame ({self.frame_width}x{self.frame_height}px)")
             avframe = AVFrame()
+            self.avframes.append(avframe)
             avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
             avframe.init_aframes(0, self.audio_extradata, None)
             avframe.vframe.plane_buffers = convert_image_to_frame(image)
