@@ -44,9 +44,10 @@ class ActImagine_LoadVXIterator:
 
 
 class ActImagine_ExportVXFolderIterator:
-    def __init__(self, avframes, audio_sample_rate, folder_path):
+    def __init__(self, avframes, audio_sample_rate, audio_streams_qty, folder_path):
         self.avframes = avframes.copy()
         self.audio_sample_rate = audio_sample_rate
+        self.audio_streams_qty = audio_streams_qty
         self.folder_path = folder_path
         self.audio_samples = np.array([], dtype=np.float32)
         self.frame_number = 1
@@ -58,20 +59,22 @@ class ActImagine_ExportVXFolderIterator:
 
     def __next__(self):
         if len(self.avframes) == 0:
-            # todo: when audio decode is complete, remove volume amplify
-            self.audio_samples /= np.max(np.abs(self.audio_samples), axis=0)
-            with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
-                f.setnchannels(1)
-                f.setsampwidth(4)
-                f.setframerate(self.audio_sample_rate)
-                f.writeframes(self.audio_samples.tobytes())
+            if self.audio_streams_qty > 0:
+                # todo: when audio decode is complete, remove volume amplify
+                self.audio_samples /= np.max(np.abs(self.audio_samples), axis=0)
+                with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
+                    f.setnchannels(1)
+                    f.setsampwidth(4)
+                    f.setframerate(self.audio_sample_rate)
+                    f.writeframes(self.audio_samples.tobytes())
             raise StopIteration
         avframe = self.avframes.pop(0)
         avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))
-        logger.debug(avframe.get_audio_samples())
-        audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
-        logger.debug(audio_s)
-        self.audio_samples = np.concatenate((self.audio_samples, audio_s), axis=0)
+        if self.audio_streams_qty > 0:
+            logger.debug(avframe.get_audio_samples())
+            audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
+            logger.debug(audio_s)
+            self.audio_samples = np.concatenate((self.audio_samples, audio_s), axis=0)
         self.frame_number += 1
 
 
@@ -272,7 +275,7 @@ class ActImagine:
         properties_jsonstr = json.dumps(properties)
         with open(os.path.join(folder_path, "properties.json"), "w") as f:
             f.write(properties_jsonstr)
-        return ActImagine_ExportVXFolderIterator(self.avframes, self.audio_sample_rate, folder_path)
+        return ActImagine_ExportVXFolderIterator(self.avframes, self.audio_sample_rate, self.audio_streams_qty, folder_path)
 
 
     def import_vxfolder(self, folder_path):

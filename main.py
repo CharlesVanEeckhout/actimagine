@@ -75,7 +75,7 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
 
-    import_vxfolder_and_save_vx(args)
+    load_vx_and_export_vxfolder(args)
 
 
 if __name__ == "__main__":
