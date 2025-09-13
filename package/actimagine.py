@@ -27,8 +27,11 @@ quant4x4_tab = [
 
 
 class ActImagine_LoadVXIterator:
-    def __init__(self, avframes):
-        self.avframes = avframes.copy()
+    def __init__(self, avframes, frames_qty):
+        self.avframes = avframes
+        self.frames_qty = frames_qty
+        self.ref_vframes = [None, None, None]
+        self.prev_aframe = None
 
 
     def __iter__(self):
@@ -36,10 +39,20 @@ class ActImagine_LoadVXIterator:
 
 
     def __next__(self):
-        if len(self.avframes) == 0:
+        if len(self.avframes) >= self.frames_qty:
             raise StopIteration
-        avframe = self.avframes.pop(0)
+        avframe = AVFrame()
+        frame_data_size = reader.int_from_bytes(2)
+        aframes_qty = reader.int_from_bytes(2)
+        avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
+        avframe.init_aframes(aframes_qty, self.audio_extradata, prev_aframe)
+        avframe.set_data(reader.bytes(frame_data_size-2))
+        self.avframes.append(avframe)
+        ref_vframes = [avframe.vframe] + ref_vframes[:-1]
+        if aframes_qty > 0:
+            prev_aframe = avframe.aframes[aframes_qty-1]
         avframe.decode()
+        self.frame_number += 1
 
 
 
@@ -76,6 +89,35 @@ class ActImagine_ExportVXFolderIterator:
             logger.debug(audio_s)
             self.audio_samples = np.concatenate((self.audio_samples, audio_s), axis=0)
         self.frame_number += 1
+
+
+
+class ActImagine_ImportVXFolderIterator:
+    def __init__(self, actimagine):
+        self.actimagine = actimagine
+        self.folder_path = folder_path
+        self.ref_vframes = [None, None, None]
+
+
+    def __iter__(self):
+        return self
+
+
+    def __next__(self):
+        self.actimagine.frames_qty = len(self.actimagine.avframes)
+        filename = os.path.join(folder_path, f"frame{self.actimagine.frames_qty+1:04d}.png")
+        if not os.path.isfile(filename):
+            raise StopIteration
+        image = Image.open(filename)
+        if (self.actimagine.frame_width, self.actimagine.frame_height) != image.size:
+            raise RuntimeError(f"dimensions of frame {self.frames_qty+1} ({image.size[0]}x{image.size[1]}px) " +
+                               f"are not the same as those of the first frame ({self.frame_width}x{self.frame_height}px)")
+        avframe = AVFrame()
+        self.actimagine.avframes.append(avframe)
+        avframe.init_vframe(self.actimagine.frame_width, self.actimagine.frame_height, self.ref_vframes, self.actimagine.qtab)
+        avframe.init_aframes(0, self.actimagine.audio_extradata, None)
+        avframe.vframe.plane_buffers = convert_image_to_frame(image)
+        self.ref_vframes = [avframe.vframe] + self.ref_vframes[:-1]
 
 
 
@@ -158,19 +200,6 @@ class ActImagine:
 
 
         self.avframes = []
-        ref_vframes = [None, None, None]
-        prev_aframe = None
-        for i in range(self.frames_qty):
-            avframe = AVFrame()
-            frame_data_size = reader.int_from_bytes(2)
-            aframes_qty = reader.int_from_bytes(2)
-            avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
-            avframe.init_aframes(aframes_qty, self.audio_extradata, prev_aframe)
-            avframe.set_data(reader.bytes(frame_data_size-2))
-            self.avframes.append(avframe)
-            ref_vframes = [avframe.vframe] + ref_vframes[:-1]
-            if aframes_qty > 0:
-                prev_aframe = avframe.aframes[aframes_qty-1]
 
         return ActImagine_LoadVXIterator(self.avframes)
 
@@ -185,30 +214,30 @@ class ActImagine:
 
     def save_vx(self):
         data_audio_extradata = bytearray()
-        
+
         for codebook in self.audio_extradata["lpc_codebooks"]:
             for lpc_filter_part in codebook:
                 for value in lpc_filter_part:
                     data_audio_extradata += (value).to_bytes(2, byteorder="little", signed=True)
-        
+
         for scale_modifier in self.audio_extradata["scale_modifiers"]:
             data_audio_extradata += (scale_modifier).to_bytes(2, byteorder="little")
-        
+
         for value in self.audio_extradata["lpc_base"]:
             data_audio_extradata += (value).to_bytes(4, byteorder="little", signed=True)
-        
+
         data_audio_extradata += (self.audio_extradata["scale_initial"]).to_bytes(4, byteorder="little")
-        
+
         data_seek_table = bytearray()
-        
+
         self.seek_table_entries_qty = 0
         for entry in self.seek_table:
             data_seek_table += (entry["frame_id"]).to_bytes(4, byteorder="little")
             data_seek_table += (entry["frame_offset"]).to_bytes(4, byteorder="little")
             self.seek_table_entries_qty += 1
-        
+
         data_avframes = bytearray()
-        
+
         self.frames_qty = 0
         self.frame_data_size_max = 0
         for avframe in self.avframes:
@@ -218,12 +247,12 @@ class ActImagine:
             data_avframes += (len(avframe.aframes)).to_bytes(2, byteorder="little")
             data_avframes += avframe.data
             self.frames_qty += 1
-        
+
         self.audio_extradata_offset = 12*4 + len(data_avframes)
         self.seek_table_offset = 12*4 + len(data_avframes) + len(data_audio_extradata)
-        
+
         data_header = bytearray()
-        
+
         data_header += self.file_signature
         data_header += (self.frames_qty).to_bytes(4, byteorder="little")
         data_header += (self.frame_width).to_bytes(4, byteorder="little")
@@ -236,10 +265,10 @@ class ActImagine:
         data_header += (self.audio_extradata_offset).to_bytes(4, byteorder="little")
         data_header += (self.seek_table_offset).to_bytes(4, byteorder="little")
         data_header += (self.seek_table_entries_qty).to_bytes(4, byteorder="little")
-        
-        
+
+
         data = data_header + data_avframes + data_audio_extradata + data_seek_table
-        
+
         return data
 
 
@@ -254,7 +283,7 @@ class ActImagine:
             "seek_table": self.seek_table,
         }
         return properties
-    
+
 
     def set_properties(self, properties):
         self.file_signature = bytearray(properties["file_signature"])
@@ -285,29 +314,16 @@ class ActImagine:
         self.set_properties(properties)
         self.audio_streams_qty = 0 # audio is not supported yet
         self.frames_qty = 0
-        self.frame_width = None
-        self.frame_height = None
+        self.frame_width = 0
+        self.frame_height = 0
         self.avframes = []
-        ref_vframes = [None, None, None]
-        while True:
-            filename = os.path.join(folder_path, f"frame{self.frames_qty+1:04d}.png")
-            if not os.path.isfile(filename):
-                break
-            print(filename)
-            image = Image.open(filename)
-            if self.frame_width is None or self.frame_height is None:
-                self.frame_width, self.frame_height = image.size
-                if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
-                    raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
-            elif (self.frame_width, self.frame_height) != image.size:
-                raise RuntimeError(f"dimensions of frame {self.frames_qty+1} ({image.size[0]}x{image.size[1]}px) " + 
-                                   f"are not the same as those of the first frame ({self.frame_width}x{self.frame_height}px)")
-            avframe = AVFrame()
-            self.avframes.append(avframe)
-            avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
-            avframe.init_aframes(0, self.audio_extradata, None)
-            avframe.vframe.plane_buffers = convert_image_to_frame(image)
-            ref_vframes = [avframe.vframe] + ref_vframes[:-1]
-            self.frames_qty += 1
+        filename = os.path.join(folder_path, f"frame{1:04d}.png")
+        if not os.path.isfile(filename):
+            return []
+        image = Image.open(filename)
+        self.frame_width, self.frame_height = image.size
+        if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
+            raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
+        
+        return ActImagine_ImportVXFolderIterator(self, folder_path)
 
-            

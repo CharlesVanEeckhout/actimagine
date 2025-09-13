@@ -26,7 +26,9 @@ def load_vx_and_export_vxfolder(args):
 def import_vxfolder_and_save_vx(args):
     act = ActImagine()
     print("importing vx folder: start")
-    act.import_vxfolder("vx_folder")
+    import_vxfolder_iter = act.import_vxfolder("vx_folder")
+    for i, _ in enumerate(import_vxfolder_iter):
+        print(f"importing vx folder: frame {i+1}/???")
     print("importing vx folder: complete")
     vframe_strategy = KeyframeOnlySimple()
     for i, avframe in enumerate(act.avframes):
