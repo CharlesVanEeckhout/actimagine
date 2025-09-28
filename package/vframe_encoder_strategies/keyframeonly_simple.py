@@ -250,7 +250,7 @@ class KeyframeOnlySimple:
 
 
     def encode_dct(self, x, y, plane):
-        step = 1 if plane == "y" else 2
+        step = get_step(plane)
         goal_residu = []
         for yy in range(y//step, y//step+4):
             row = []
@@ -291,7 +291,7 @@ class KeyframeOnlySimple:
             dct[i] *= self.vframe.qtab[(i & 1) + ((i >> 2) & 1)]
 
         # h264_idct_add
-        step = 1 if plane == "y" else 2
+        step = get_step(plane)
 
         dct[0] += 1 << 5
 

@@ -138,6 +138,7 @@ class BitStreamWriter:
         else:
             self.data[len(self.data)-1] += (value >> (7 - self.bit_number))
             self._data_append((value << (self.bit_number + 9)) & 0xffff)
+        self.bit_number = self.bit_number ^ 8 # xor bc 8 is half of 16
 
     def bytes(self, data):
         for byte in data:

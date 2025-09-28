@@ -5,7 +5,7 @@ import logging
 from package.actimagine import ActImagine
 from package.vframe import VFrame
 import package.io as io
-from package.vframe_encoder_strategies.keyframeonly_simple import KeyframeOnlySimple
+from package.vframe_encoder_strategies import KeyframeOnlySimple
 from package.vframe_convert import convert_image_to_frame
 
 
@@ -77,7 +77,7 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
 
-    load_vx_and_export_vxfolder(args)
+    import_vxfolder_and_save_vx(args)
 
 
 if __name__ == "__main__":

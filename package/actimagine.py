@@ -27,9 +27,9 @@ quant4x4_tab = [
 
 
 class ActImagine_LoadVXIterator:
-    def __init__(self, avframes, frames_qty):
-        self.avframes = avframes
-        self.frames_qty = frames_qty
+    def __init__(self, actimagine, reader):
+        self.actimagine = actimagine
+        self.reader = reader
         self.ref_vframes = [None, None, None]
         self.prev_aframe = None
 
@@ -39,20 +39,22 @@ class ActImagine_LoadVXIterator:
 
 
     def __next__(self):
-        if len(self.avframes) >= self.frames_qty:
+        if len(self.actimagine.avframes) >= self.actimagine.frames_qty:
             raise StopIteration
         avframe = AVFrame()
-        frame_data_size = reader.int_from_bytes(2)
-        aframes_qty = reader.int_from_bytes(2)
-        avframe.init_vframe(self.frame_width, self.frame_height, ref_vframes, self.qtab)
-        avframe.init_aframes(aframes_qty, self.audio_extradata, prev_aframe)
-        avframe.set_data(reader.bytes(frame_data_size-2))
-        self.avframes.append(avframe)
-        ref_vframes = [avframe.vframe] + ref_vframes[:-1]
+        frame_data_size = self.reader.int_from_bytes(2)
+        aframes_qty = self.reader.int_from_bytes(2)
+        avframe.init_vframe(
+            self.actimagine.frame_width, self.actimagine.frame_height, 
+            self.ref_vframes, self.actimagine.qtab
+        )
+        avframe.init_aframes(aframes_qty, self.actimagine.audio_extradata, self.prev_aframe)
+        avframe.set_data(self.reader.bytes(frame_data_size-2))
+        self.actimagine.avframes.append(avframe)
+        self.ref_vframes = [avframe.vframe] + self.ref_vframes[:-1]
         if aframes_qty > 0:
-            prev_aframe = avframe.aframes[aframes_qty-1]
+            self.prev_aframe = avframe.aframes[aframes_qty-1]
         avframe.decode()
-        self.frame_number += 1
 
 
 
@@ -93,7 +95,7 @@ class ActImagine_ExportVXFolderIterator:
 
 
 class ActImagine_ImportVXFolderIterator:
-    def __init__(self, actimagine):
+    def __init__(self, actimagine, folder_path):
         self.actimagine = actimagine
         self.folder_path = folder_path
         self.ref_vframes = [None, None, None]
@@ -105,7 +107,7 @@ class ActImagine_ImportVXFolderIterator:
 
     def __next__(self):
         self.actimagine.frames_qty = len(self.actimagine.avframes)
-        filename = os.path.join(folder_path, f"frame{self.actimagine.frames_qty+1:04d}.png")
+        filename = os.path.join(self.folder_path, f"frame{self.actimagine.frames_qty+1:04d}.png")
         if not os.path.isfile(filename):
             raise StopIteration
         image = Image.open(filename)
@@ -201,7 +203,7 @@ class ActImagine:
 
         self.avframes = []
 
-        return ActImagine_LoadVXIterator(self.avframes)
+        return ActImagine_LoadVXIterator(self, reader)
 
 
     def calculate_qtab(self):
