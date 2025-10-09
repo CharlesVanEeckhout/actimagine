@@ -86,7 +86,7 @@ class AFrameDecoder:
                 self.lpc_filter_quarters[0].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 1 // 4)
                 self.lpc_filter_quarters[1].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 2 // 4)
                 self.lpc_filter_quarters[2].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 3 // 4)
-                self.lpc_filter_quarters[3].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
+                self.lpc_filter_quarters[3].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 4 // 4)
                 self.aframe.lpc_filter[i] += lpc_filter_difference[i]
         else:
             # intra frame
@@ -111,13 +111,14 @@ class AFrameDecoder:
             pulse = 0
             if index >= 0 and index < len(self.pulse_values) and (index % 1) == 0:
                 pulse = self.pulse_values[int(index)]
-            sample = pulse
+            sample = pulse # most likely correct value
             for j in range(len(lpc_filter_quarter)):
                 prev_sample_index = i - 1 - j
                 if prev_sample_index < 0:
                     prev_sample = prev_samples[8 + prev_sample_index]
                 else:
                     prev_sample = self.samples[prev_sample_index]
-                sample += prev_sample * lpc_filter_quarter[j] // 65536 # maybe??
+                # lpc filter may be incorrect and/or applied incorrectly
+                sample += prev_sample * lpc_filter_quarter[j] // 0x20000 # maybe??
             self.samples.append(sample)
         self.aframe.samples = self.samples
