@@ -55,8 +55,8 @@ def reencode_first_frame(args):
     act = ActImagine()
     with open(args.filename, "rb") as f:
         data = f.read()
-    act.load_vx(data)
-    act.avframes[0].decode()
+    load_vx_iter = act.load_vx(data)
+    next(load_vx_iter)
     act.avframes[0].vframe.export_image("frame_0001.png")
     with Image.open("frame_0001.png") as im:
         im_width, im_height = im.size
@@ -77,7 +77,7 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
 
-    import_vxfolder_and_save_vx(args)
+    reencode_first_frame(args)
 
 
 if __name__ == "__main__":

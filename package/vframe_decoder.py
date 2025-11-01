@@ -304,7 +304,7 @@ class VFrameDecoder:
 
 
     def decode_residu_blocks(self, block):
-        # residu block is 8x8 px which contains 4 4x4 px blocks for y and 1 8x8 px block for uv
+        # residu block is 8x8 px which contains 4 4x4 px blocks for y and 1 double-size 4x4 px block for uv
         for y in range(0, block["h"], 8):
             for x in range(0, block["w"], 8):
                 residu_mask_tab_index = self.reader.unsigned_expgolomb()
