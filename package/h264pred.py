@@ -5,22 +5,20 @@
 def pred4x4_vertical(plane_buffer, dst):
     # fill the 4x4 block with the top edge pixels
     for y in range(4):
-        for x in range(4):
-            plane_buffer[dst["y"] + y][dst["x"] + x] = plane_buffer[dst["y"] - 1][dst["x"] + x]
+        plane_buffer[dst["y"] + y][dst["x"]:dst["x"]+4] = plane_buffer[dst["y"] - 1][dst["x"]:dst["x"]+4]
 
 
 def pred4x4_horizontal(plane_buffer, dst):
     # fill the 4x4 block with the left edge pixels
     for y in range(4):
-        for x in range(4):
-            plane_buffer[dst["y"] + y][dst["x"] + x] = plane_buffer[dst["y"] + y][dst["x"] - 1]
+        pixel_value = plane_buffer[dst["y"] + y][dst["x"] - 1]
+        plane_buffer[dst["y"] + y][dst["x"]:dst["x"]+4] = [pixel_value]*4
 
 
 def pred4x4_128_dc(plane_buffer, dst):
     # fill the 4x4 block with gray
     for y in range(4):
-        for x in range(4):
-            plane_buffer[dst["y"] + y][dst["x"] + x] = 128
+        plane_buffer[dst["y"] + y][dst["x"]:dst["x"]+4] = [128]*4
 
 
 def pred4x4_top_dc(plane_buffer, dst):
@@ -33,8 +31,7 @@ def pred4x4_top_dc(plane_buffer, dst):
         2
     ) // 4
     for y in range(4):
-        for x in range(4):
-            plane_buffer[dst["y"] + y][dst["x"] + x] = dc
+        plane_buffer[dst["y"] + y][dst["x"]:dst["x"]+4] = [dc]*4
 
 
 def pred4x4_left_dc(plane_buffer, dst):
@@ -47,8 +44,7 @@ def pred4x4_left_dc(plane_buffer, dst):
         2
     ) // 4
     for y in range(4):
-        for x in range(4):
-            plane_buffer[dst["y"] + y][dst["x"] + x] = dc
+        plane_buffer[dst["y"] + y][dst["x"]:dst["x"]+4] = [dc]*4
 
 
 def pred4x4_dc(plane_buffer, dst):
@@ -65,8 +61,7 @@ def pred4x4_dc(plane_buffer, dst):
         4
     ) // 8
     for y in range(4):
-        for x in range(4):
-            plane_buffer[dst["y"] + y][dst["x"] + x] = dc
+        plane_buffer[dst["y"] + y][dst["x"]:dst["x"]+4] = [dc]*4
 
 
 def pred4x4_down_left(plane_buffer, dst):

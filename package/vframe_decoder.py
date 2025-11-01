@@ -120,11 +120,7 @@ class VFrameDecoder:
 
 
     def predict4(self, block):
-        pred4_cache = []
-        for i in range(5):
-            pred4_cache.append([])
-            for j in range(5):
-                pred4_cache[i].append(9)
+        pred4_cache = [[9]*5 for i in range(5)]
 
         for y2 in range(block["h"] // 4):
             for x2 in range(block["w"] // 4):
@@ -148,14 +144,14 @@ class VFrameDecoder:
                 elif mode == 1: # horizontal
                     h264pred.pred4x4_horizontal(self.vframe.plane_buffers["y"], dst)
                 elif mode == 2: # dc
-                    if dst["x"] == 0 and dst["y"] == 0:
-                        h264pred.pred4x4_128_dc(self.vframe.plane_buffers["y"], dst)
-                    elif dst["x"] == 0 and dst["y"] != 0:
-                        h264pred.pred4x4_top_dc(self.vframe.plane_buffers["y"], dst)
-                    elif dst["x"] != 0 and dst["y"] == 0:
-                        h264pred.pred4x4_left_dc(self.vframe.plane_buffers["y"], dst)
-                    else:
+                    if dst["x"] != 0 and dst["y"] != 0:
                         h264pred.pred4x4_dc(self.vframe.plane_buffers["y"], dst)
+                    elif dst["x"] != 0:
+                        h264pred.pred4x4_left_dc(self.vframe.plane_buffers["y"], dst)
+                    elif dst["y"] != 0:
+                        h264pred.pred4x4_top_dc(self.vframe.plane_buffers["y"], dst)
+                    else:
+                        h264pred.pred4x4_128_dc(self.vframe.plane_buffers["y"], dst)
                 elif mode == 3: # diagonal-down-left
                     h264pred.pred4x4_down_left(self.vframe.plane_buffers["y"], dst)
                 elif mode == 4: # diagonal-down-right
@@ -439,13 +435,9 @@ class VFrameDecoder:
     def decode_dct(self, x, y, plane, level):
         dct = [None] * len(zigzag_scan)
 
-        # dezigzag
+        # dezigzag and dequantize
         for i, z in enumerate(zigzag_scan):
-            dct[z] = level[i]
-
-        # dequantize
-        for i in range(16):
-            dct[i] *= self.vframe.qtab[(i & 1) + ((i >> 2) & 1)]
+            dct[z] = level[i] * self.vframe.qtab[(z & 1) + ((z >> 2) & 1)]
 
         # h264_idct_add
         step = get_step(plane)

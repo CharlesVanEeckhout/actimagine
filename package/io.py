@@ -94,7 +94,7 @@ class DataReader:
         out = vlc.find_bit_string(bit_string)
         while len(out) > 0 and out[0][1] != bit_string:
             bit_string += str(self.bit())
-            out = vlc.find_bit_string(bit_string)
+            out = [bs for bs in out if bs[1].startswith(bit_string)]
         if len(out) == 0:
             return -1
         return out[0][0]
@@ -167,7 +167,8 @@ class BitStreamWriter:
         value += 1
         out = f"{value:b}"
         out = "0" * (len(out) - 1) + out
-        self.bits([int(bit) for bit in out])
+        for b in out:
+            self.bit(int(b))
 
     def signed_expgolomb(self, value):
         value = value * 2

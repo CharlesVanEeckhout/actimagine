@@ -49,7 +49,7 @@ def mid_pred(a, b, c):
     return sorted([a, b, c])[1]
 
 def av_clip_pixel(x):
-    return mid_pred(0, x, 255)
+    return min(max(0, x), 255)
 
 def block_half_left(block):
     return {

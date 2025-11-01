@@ -3,7 +3,7 @@ class VLC:
     def __init__(self, bits, codes):
         self.bit_strings = []
         for (b, c) in zip(bits, codes, strict=True):
-            bit_string = ("{:0" + str(b) + "b}").format(c)
+            bit_string = f"{c:0{b}b}"
             if len(bit_string) != b:
                 bit_string = bit_string[len(bit_string)-b:]
             self.bit_strings.append(bit_string)
