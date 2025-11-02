@@ -1,11 +1,11 @@
 
 class VLC:
-    def __init__(self, bits, codes):
+    def __init__(self, len_list, bits_list):
         self.bit_strings = []
-        for (b, c) in zip(bits, codes, strict=True):
-            bit_string = f"{c:0{b}b}"
-            if len(bit_string) != b:
-                bit_string = bit_string[len(bit_string)-b:]
+        for (l, b) in zip(len_list, bits_list, strict=True):
+            bit_string = f"{b:0{l}b}"
+            if len(bit_string) != l:
+                bit_string = bit_string[len(bit_string)-l:]
             self.bit_strings.append(bit_string)
 
     def find_bit_string(self, bit_string):
