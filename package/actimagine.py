@@ -75,7 +75,7 @@ class ActImagine_ExportVXFolderIterator:
     def __next__(self):
         if len(self.avframes) == 0:
             if self.audio_streams_qty > 0:
-                # volume amplify
+                # todo: when audio decode is complete, remove volume amplify
                 self.audio_samples *= 0x7fffffff // np.max(np.abs(self.audio_samples), axis=0)
                 with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
                     f.setnchannels(1)
