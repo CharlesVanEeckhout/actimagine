@@ -64,7 +64,7 @@ class ActImagine_ExportVXFolderIterator:
         self.audio_sample_rate = audio_sample_rate
         self.audio_streams_qty = audio_streams_qty
         self.folder_path = folder_path
-        self.audio_samples = np.array([], dtype=np.float32)
+        self.audio_samples = np.array([], dtype=np.int32) # should be int16, but set to int32 for debug purposes
         self.frame_number = 1
 
 
@@ -76,7 +76,7 @@ class ActImagine_ExportVXFolderIterator:
         if len(self.avframes) == 0:
             if self.audio_streams_qty > 0:
                 # todo: when audio decode is complete, remove volume amplify
-                self.audio_samples /= np.max(np.abs(self.audio_samples), axis=0)
+                self.audio_samples *= 0x7fffffff // np.max(np.abs(self.audio_samples), axis=0)
                 with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
                     f.setnchannels(1)
                     f.setsampwidth(4)
@@ -87,7 +87,7 @@ class ActImagine_ExportVXFolderIterator:
         avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))
         if self.audio_streams_qty > 0:
             logger.debug(avframe.get_audio_samples())
-            audio_s = np.array(avframe.get_audio_samples(), dtype=np.float32)
+            audio_s = np.array(avframe.get_audio_samples(), dtype=self.audio_samples.dtype)
             logger.debug(audio_s)
             self.audio_samples = np.concatenate((self.audio_samples, audio_s), axis=0)
         self.frame_number += 1
