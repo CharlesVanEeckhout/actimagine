@@ -533,7 +533,7 @@ class VFrameDecoder:
             self.predict_inter(block, pred_vec, False, self.vframe.ref_vframes[1])
             if block["w"] >= 8 and block["h"] >= 8:
                 self.clear_total_coeff(block)
-        elif mode == 10: # unpredicted delta ref0 + dc offset, no residu
+        elif mode == 10: # unpredicted delta ref0 + dc offset, residu
             self.predict_inter_dc(block)
             self.decode_residu_blocks(block)
         elif mode == 11: # predict notile, no residu
