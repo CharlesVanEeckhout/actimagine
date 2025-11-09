@@ -49,19 +49,6 @@ class KeyframeOnlySimple(VFrameEncoderStrategyAbstract):
         plane_buffer_iterator(block, plane, predict_dc_callback)
 
 
-    def predict_notile(self, block):
-        self.writer.unsigned_expgolomb(2) # predict_dc
-        self.predict_dc(block, "y")
-
-        self.predict_notile_uv(block)
-
-
-    def predict_notile_uv(self, block):
-        self.writer.unsigned_expgolomb(0) # predict_dc
-        self.predict_dc(block, "u")
-        self.predict_dc(block, "v")
-
-
     def encode_mb(self, block):
         if block["w"] > block["h"]:
             # split the block in left and right parts
@@ -82,6 +69,16 @@ class KeyframeOnlySimple(VFrameEncoderStrategyAbstract):
             return
 
         # blocks are 8x8 here
-        self.writer.unsigned_expgolomb(22) # predict notile, residu
-        self.predict_notile(block)
-        encode_residu_blocks(self, block)
+        self.predict_dc(block, "y")
+        self.predict_dc(block, "u")
+        self.predict_dc(block, "v")
+        residu_cr = encode_residu_blocks_check(self, block)
+        if residu_cr["is_worth_encoding"]:
+            self.writer.unsigned_expgolomb(22) # predict notile, residu
+            self.writer.unsigned_expgolomb(2) # predict_notile.predict_dc
+            self.writer.unsigned_expgolomb(0) # predict_notile_uv.predict_dc
+            encode_residu_blocks_write(self, residu_cr)
+        else:
+            self.writer.unsigned_expgolomb(11) # predict notile, no residu
+            self.writer.unsigned_expgolomb(2) # predict_notile.predict_dc
+            self.writer.unsigned_expgolomb(0) # predict_notile_uv.predict_dc

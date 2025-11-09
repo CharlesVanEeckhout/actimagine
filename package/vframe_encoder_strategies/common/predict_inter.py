@@ -3,6 +3,7 @@ import logging
 from ... import vlc
 from ...frame_includes import *
 from ...vframe_decoder import VFrameDecoder
+from .encode_residu_blocks import encode_residu_blocks_check, encode_residu_blocks_write
 
 logger = logging.getLogger(__name__)
 logger.propagate = True # enable/disable
@@ -15,10 +16,14 @@ logger.propagate = True # enable/disable
         self.coeff_buffers = None
         self.dct_filters = None"""
 
-
-def encode_predict_inter(self, block, pred_vec, error_threshold):
+def encode_predict_inter_check(self, block, pred_vec, error_threshold):
+    check_result = {
+        "is_worth_encoding": False,
+        "block": block,
+        "pred_vec": pred_vec
+    }
     if self.vframe.ref_vframes[0] is None:
-        raise RuntimeError("vframe has no ref vframes for encode_predict_inter")
+        return check_result
     
     # try with frame 0 first, can use dc
     error_dicts = [block_matching_fourstepsearch(self, self.vframe.ref_vframes[0], block, block_matching_get_error_dc)]
@@ -38,20 +43,35 @@ def encode_predict_inter(self, block, pred_vec, error_threshold):
     
     min_error /= block["w"] * block["h"]
     
-    if min_error > error_threshold:
-        return False
+    check_result["is_worth_encoding"] = (min_error > error_threshold)
+    check_result["error_dict"] = error_dicts[min_i]
+    check_result["min_i"] = min_i
+    return check_result
+
+def encode_predict_inter_write(self, check_result):
+    error_dict = check_result["error_dict"]
+    min_i = check_result["min_i"]
+    block = check_result["block"]
+    pred_vec = check_result["pred_vec"]
     
-    # error is good, lets prepare encoding
-    error_dict = error_dicts[min_i]
+    # copy ref block to self.vframe
+    ref_vframe = self.vframe.ref_vframes[min_i]
+    def predict_inter_callback(x, y, plane):
+        self.vframe.plane_buffer_setter(plane, x, y,
+            ref_vframe.plane_buffer_getter(plane, x-block["x"]+error_dict["min_block"]["x"], y-block["y"]+error_dict["min_block"]["y"])
+        )
     
+    plane_buffer_iterator(block, "yuv", predict_inter_callback)
+    
+    # dc
     is_dc = (min_i == 0)
-    
     if min_i == 0:
         min_dc = error_dict["min_dc"]
         if min_dc["y"] == 0 and min_dc["u"] == 0 and min_dc["v"] == 0:
             # dont use dc for frame 0
             is_dc = False
     
+    # delta
     delta = {
         "x": error_dict["min_block"]["x"] - block["x"],
         "y": error_dict["min_block"]["y"] - block["y"]
@@ -59,44 +79,24 @@ def encode_predict_inter(self, block, pred_vec, error_threshold):
     if not is_dc:
         delta["x"] -= pred_vec["x"]
         delta["y"] -= pred_vec["y"]
-    
     has_delta = is_dc or (delta["x"] != 0 or delta["y"] != 0)
     
-    # copy ref block to self.vframe
-    
     # get residu
-    
-    has_residu = False
+    residu_cr = encode_residu_blocks_check(self, block)
+    has_residu = residu_cr["is_worth_encoding"]
     
     # get mode
+    mode = None
+    if is_dc:
+        mode = [3, 10][has_residu*1]
+    elif min_i == 0:
+        mode = [1, 12, 4, 16][has_residu*1 + has_delta*2]
+    elif min_i == 1:
+        mode = [9, 20, 5, 17][has_residu*1 + has_delta*2]
+    elif min_i == 2:
+        mode = [14, 21, 6, 18][has_residu*1 + has_delta*2]
     
-    """
-    mode == 10: # unpredicted delta ref0 + dc offset, residu
-    mode == 3: # unpredicted delta ref0 + dc offset, no residu
-
-    mode == 16: # delta, residu, ref 0
-    mode == 4: # delta, no residu, ref 0
-
-    mode == 12: # no delta, residu, ref 0
-    mode == 1: # no delta, no residu, ref 0
-
-
-    mode == 17: # delta, residu, ref 1
-    mode == 5: # delta, no residu, ref 1
-
-    mode == 20: # no delta, residu, ref 1
-    mode == 9: # no delta, no residu, ref 1
-
-
-    mode == 18: # delta, residu, ref 2
-    mode == 6: # delta, no residu, ref 2
-
-    mode == 21: # no delta, residu, ref 2
-    mode == 14: # no delta, no residu, ref 2
-    """
-    mode = -1
-    
-    # encode
+    # encode predict_inter
     self.writer.unsigned_expgolomb(mode)
     
     if has_delta:
@@ -109,12 +109,8 @@ def encode_predict_inter(self, block, pred_vec, error_threshold):
         self.writer.signed_expgolomb(error_dict["min_dc"]["v"] // 2)
     
     # encode residu
-    
     if has_residu:
-        pass
-    
-    return True
-
+        encode_residu_blocks_write(self, residu_cr)
 
 
 def block_matching_fourstepsearch(self, ref_vframe, block, get_error):
