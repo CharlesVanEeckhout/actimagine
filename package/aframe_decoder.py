@@ -30,12 +30,14 @@ class AFrameDecoder:
             (aframe_header_word2 >> 6) & 0x3f,
             (aframe_header_word2 >> 0) & 0x3f
         ]
+        
         self.pulse_data = []
         for i in range([8, 5, 4, 3][self.pulse_packing_mode]):
             self.pulse_data.append(self.reader.int_from_bits(16))
 
-
-        scale = self.aframe.audio_extradata["scale_modifiers"][self.scale_modifier_index]
+        scale = self.aframe.audio_extradata["scale_initial"]
+        scale *= self.aframe.audio_extradata["scale_modifiers"][self.scale_modifier_index]
+        
         distance = [3, 3, 4, 5][self.pulse_packing_mode]
         self.pulse_values = []
         if self.pulse_packing_mode == 0:
@@ -61,14 +63,16 @@ class AFrameDecoder:
 
             self.pulse_values = [(val * 2 - 3) * scale for val in self.pulse_values]
 
-
-        self.aframe.lpc_filter = self.aframe.audio_extradata["lpc_base"].copy()
-        if self.prev_frame_offset != 0x7f:
+        if self.prev_frame_offset == 0x7f:
+            # intra frame
+            self.aframe.lpc_filter = self.aframe.audio_extradata["lpc_base"].copy()
+        else:
             # inter frame
             if self.aframe.prev_aframe is None:
                 raise RuntimeError("inter aframe has no previous aframe")
             self.aframe.lpc_filter = self.aframe.prev_aframe.lpc_filter.copy()
-        
+
+
         lpc_filter_difference = []
         for k in range(8):
             coeff_sum = 0
@@ -111,14 +115,19 @@ class AFrameDecoder:
             pulse = 0
             if index >= 0 and index < len(self.pulse_values) and (index % 1) == 0:
                 pulse = self.pulse_values[int(index)]
-            sample = pulse # most likely correct value
+            sample = pulse
+            p_j = [1, 0]
+            for j in range(len(lpc_filter_quarter)):
+                c_j = lpc_filter_quarter[j] / 0x8000
+                p_j = [p_j[k] + p_j[len(p_j)-1-k]*c_j for k in range(len(p_j))] + [0]
             for j in range(len(lpc_filter_quarter)):
                 prev_sample_index = i - 1 - j
                 if prev_sample_index < 0:
                     prev_sample = prev_samples[8 + prev_sample_index]
                 else:
                     prev_sample = self.samples[prev_sample_index]
-                # lpc filter may be incorrect and/or applied incorrectly
-                sample += prev_sample * lpc_filter_quarter[j] // 0x20000 # maybe??
+                sample -= prev_sample * p_j[j+1]
             self.samples.append(sample)
         self.aframe.samples = self.samples
+        print(self.samples)
+

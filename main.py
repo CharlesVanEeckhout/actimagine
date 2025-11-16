@@ -77,7 +77,7 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
 
-    reencode_first_frame(args)
+    load_vx_and_export_vxfolder(args)
 
 
 if __name__ == "__main__":
