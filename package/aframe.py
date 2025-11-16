@@ -5,6 +5,8 @@ from .aframe_decoder import AFrameDecoder
 class AFrame:
     def __init__(self, audio_extradata, prev_aframe):
         self.samples = None
+        self.pulses = None
+        self.scale = None
         self.lpc_filter = None
         self.audio_extradata = audio_extradata
         self.prev_aframe = prev_aframe

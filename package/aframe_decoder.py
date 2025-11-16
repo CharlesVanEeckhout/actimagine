@@ -1,3 +1,4 @@
+import math
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,8 @@ class AFrameDecoder:
 
 
     def decode(self):
+        print()
+        print("aframe")
         aframe_header_word1 = self.reader.int_from_bits(16)
         aframe_header_word2 = self.reader.int_from_bits(16)
         self.prev_frame_offset = (aframe_header_word1 >> 9) & 0x7f
@@ -35,8 +38,18 @@ class AFrameDecoder:
         for i in range([8, 5, 4, 3][self.pulse_packing_mode]):
             self.pulse_data.append(self.reader.int_from_bits(16))
 
-        scale = self.aframe.audio_extradata["scale_initial"]
-        scale *= self.aframe.audio_extradata["scale_modifiers"][self.scale_modifier_index]
+        if self.aframe.prev_aframe is not None:
+            self.aframe.scale = self.aframe.prev_aframe.scale
+        else:
+            self.aframe.scale = self.aframe.audio_extradata["scale_initial"] * 0x2000
+        self.aframe.scale *= self.aframe.audio_extradata["scale_modifiers"][self.scale_modifier_index] / 0x2000
+        
+        if self.aframe.scale > 0x0FFFFFFF: # debug failsafe to be removed
+            self.aframe.scale /= 0x10
+        
+        print(self.prev_frame_offset)
+        print(self.aframe.audio_extradata["scale_modifiers"][self.scale_modifier_index])
+        print(self.aframe.scale)
         
         distance = [3, 3, 4, 5][self.pulse_packing_mode]
         self.pulse_values = []
@@ -55,13 +68,25 @@ class AFrameDecoder:
                 (self.pulse_data[5] & 1) * 1
             )
 
-            self.pulse_values = [(val * 2 - 7) * scale for val in self.pulse_values]
+            self.pulse_values = [(val * 2 - 7) * self.aframe.scale for val in self.pulse_values]
         else:
             for i in range(len(self.pulse_data)):
                 for j in range(16 - 2, -1, -2):
                     self.pulse_values.append((self.pulse_data[i] >> j) & 0x3)
 
-            self.pulse_values = [(val * 2 - 3) * scale for val in self.pulse_values]
+            self.pulse_values = [(val * 2 - 3) * self.aframe.scale for val in self.pulse_values]
+
+        self.aframe.pulses = []
+        for i in range(0, 128):
+            index = (i - self.pulse_start_position) / distance
+            pulse = 0
+            if index >= 0 and index < len(self.pulse_values) and (index % 1) == 0:
+                pulse = self.pulse_values[int(index)]
+            self.aframe.pulses.append(pulse)
+        if self.prev_frame_offset < 0x7E:
+            for i in range(0x7E-self.prev_frame_offset, 128):
+                self.aframe.pulses[i-(0x7E-self.prev_frame_offset)] += self.aframe.prev_aframe.pulses[i]
+
 
         if self.prev_frame_offset == 0x7f:
             # intra frame
@@ -71,7 +96,6 @@ class AFrameDecoder:
             if self.aframe.prev_aframe is None:
                 raise RuntimeError("inter aframe has no previous aframe")
             self.aframe.lpc_filter = self.aframe.prev_aframe.lpc_filter.copy()
-
 
         lpc_filter_difference = []
         for k in range(8):
@@ -101,33 +125,31 @@ class AFrameDecoder:
                 self.lpc_filter_quarters[3].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
                 self.aframe.lpc_filter[i] += lpc_filter_difference[i]
 
+        
         prev_samples = [0, 0, 0, 0, 0, 0, 0, 0]
         self.samples = []
         if self.prev_frame_offset < 0x7E:
-            for i in range(0x7E-self.prev_frame_offset, 128):
-                self.samples.append(self.aframe.prev_aframe.samples[i])
             prev_samples = []
             for i in range(120, 128):
                 prev_samples.append(self.aframe.prev_aframe.samples[i])
-        for i in range(len(self.samples), 128):
+        for i in range(0, 128):
             lpc_filter_quarter = self.lpc_filter_quarters[i * 4 // 128]
             index = (i - self.pulse_start_position) / distance
-            pulse = 0
-            if index >= 0 and index < len(self.pulse_values) and (index % 1) == 0:
-                pulse = self.pulse_values[int(index)]
-            sample = pulse
-            p_j = [1, 0]
+            sample = self.aframe.pulses[i]
+            prev_sample_influence = [1.0, 0.0]
             for j in range(len(lpc_filter_quarter)):
-                c_j = lpc_filter_quarter[j] / 0x8000
-                p_j = [p_j[k] + p_j[len(p_j)-1-k]*c_j for k in range(len(p_j))] + [0]
+                coeff = lpc_filter_quarter[j] / 0x8000
+                prev_sample_influence = [prev_sample_influence[k] + prev_sample_influence[len(prev_sample_influence)-1-k]*coeff for k in range(len(prev_sample_influence))] + [0]
+            if i == 127:
+                print(prev_sample_influence)
             for j in range(len(lpc_filter_quarter)):
                 prev_sample_index = i - 1 - j
                 if prev_sample_index < 0:
                     prev_sample = prev_samples[8 + prev_sample_index]
                 else:
                     prev_sample = self.samples[prev_sample_index]
-                sample -= prev_sample * p_j[j+1]
-            self.samples.append(sample)
+                sample -= prev_sample * prev_sample_influence[j+1]
+            self.samples.append(math.floor(sample))
         self.aframe.samples = self.samples
-        print(self.samples)
+        print(self.samples[0])
 
