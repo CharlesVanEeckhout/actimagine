@@ -2,7 +2,7 @@
 
 import os
 import numpy as np
-import wave
+from scipy.io import wavfile
 import json
 from PIL import Image
 import logging
@@ -77,11 +77,7 @@ class ActImagine_ExportVXFolderIterator:
             if self.audio_streams_qty > 0:
                 # todo: clip audio to [-1, 1]
                 self.audio_samples *= 8
-                with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
-                    f.setnchannels(1)
-                    f.setsampwidth(4)
-                    f.setframerate(self.audio_sample_rate)
-                    f.writeframes(self.audio_samples.tobytes())
+                wavfile.write(os.path.join(self.folder_path, "fullaudio.wav"), self.audio_sample_rate, self.audio_samples)
             raise StopIteration
         avframe = self.avframes.pop(0)
         avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))

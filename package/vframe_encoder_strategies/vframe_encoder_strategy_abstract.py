@@ -55,3 +55,4 @@ class VFrameEncoderStrategyAbstract:
         # align with word
         while self.writer.bit_number != 15:
             self.writer.bit(0)
+

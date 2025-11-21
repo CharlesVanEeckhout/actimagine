@@ -40,11 +40,11 @@ class AVFrame:
             aframe.decode(reader)
 
 
-    def encode(self, goal_plane_buffers, vframe_strategy):
+    def encode(self, goal_plane_buffers, vframe_strategy, aframe_strategy):
         writer = io.BitStreamWriter()
         self.vframe.encode(writer, goal_plane_buffers, vframe_strategy)
         for aframe in self.aframes:
-            aframe.encode(writer)
+            aframe.encode(writer, aframe_strategy)
         self.data = writer.get_data_bytes()
 
 

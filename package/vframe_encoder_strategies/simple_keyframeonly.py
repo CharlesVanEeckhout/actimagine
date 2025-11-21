@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 logger.propagate = True # enable/disable
 
 
-class KeyframeOnlySimple(VFrameEncoderStrategyAbstract):
+class SimpleKeyframeOnly(VFrameEncoderStrategyAbstract):
     def predict_dc(self, block, plane):
         dc = 128
         logger.debug("predict_dc")
@@ -82,3 +82,4 @@ class KeyframeOnlySimple(VFrameEncoderStrategyAbstract):
             self.writer.unsigned_expgolomb(11) # predict notile, no residu
             self.writer.unsigned_expgolomb(2) # predict_notile.predict_dc
             self.writer.unsigned_expgolomb(0) # predict_notile_uv.predict_dc
+
