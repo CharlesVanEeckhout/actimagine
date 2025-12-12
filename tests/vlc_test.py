@@ -1,7 +1,7 @@
 import sys
 sys.path.append('..')
 
-from package import read
+from package import io
 
 
 def vlc_test(expected_results, tested_vlc):
@@ -16,12 +16,14 @@ def vlc_test(expected_results, tested_vlc):
         for j in range(nb_bits):
             gb_buffer[j] = (i >> (nb_bits-1-j)) & 1
         
-        reader = read.BitsReader(gb_buffer, 0)
+        reader = io.DataReader()
+        reader.set_data_bits(gb_buffer)
         code = reader.vlc2(tested_vlc)
-        results.append({"gb_buffer": "".join([str(b) for b in gb_buffer]), "code": code, "end_index": reader.offset})
+        offset = int(reader.offset * 8)
+        results.append({"gb_buffer": "".join([str(b) for b in gb_buffer]), "code": code, "end_index": offset})
         
         if code != -1:
-            i = i | (((1 << nb_bits)-1) >> reader.offset)
+            i = i | (((1 << nb_bits)-1) >> offset)
         i += 1
     
     for e_res, res in zip(expected_results, results, strict=True):
