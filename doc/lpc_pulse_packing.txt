@@ -1,0 +1,29 @@
+LPC Pulse Packing Layouts
+
+mode 0
+    000111222333444E
+    555666777888999E
+    aaabbbcccdddeeeE
+    fffggghhhiiijjjF
+    kkklllmmmnnnoooF
+    pppqqqrrrssstttF
+    uuuvvvwwwxxxyyy-
+    zzzAAABBBCCCDDD-
+
+mode 1
+    0011223344556677
+    8899aabbccddeeff
+    gghhiijjkkllmmnn
+    ooppqqrrssttuuvv
+    wwxxyyzzAABBCCDD
+
+mode 2
+    0011223344556677
+    8899aabbccddeeff
+    gghhiijjkkllmmnn
+    ooppqqrrssttuuvv
+
+mode 3
+    0011223344556677
+    8899aabbccddeeff
+    gghhiijjkkllmmnn

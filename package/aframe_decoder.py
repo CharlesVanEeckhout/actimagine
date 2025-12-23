@@ -1,6 +1,8 @@
 import math
 import logging
 
+from . import frame_includes
+
 logger = logging.getLogger(__name__)
 logger.propagate = True # enable/disable
 
@@ -17,6 +19,59 @@ class AFrameDecoder:
         self.pulse_data = None
         self.pulse_values = None
         self.lpc_filter_quarters = None
+
+
+    def unpack_pulse_values(pulse_packing_mode, pulse_data):
+        pulse_values = []
+        if pulse_packing_mode == 0:
+            for i in range(len(pulse_data)):
+                for j in range(16 - 3, -1, -3):
+                    pulse_values.append((pulse_data[i] >> j) & 0x7)
+            pulse_values.append(
+                (pulse_data[0] & 1) * 4 +
+                (pulse_data[1] & 1) * 2 +
+                (pulse_data[2] & 1) * 1
+            )
+            pulse_values.append(
+                (pulse_data[3] & 1) * 4 +
+                (pulse_data[4] & 1) * 2 +
+                (pulse_data[5] & 1) * 1
+            )
+
+            pulse_values = [(val * 2 - 7) for val in pulse_values]
+        else:
+            for i in range(len(pulse_data)):
+                for j in range(16 - 2, -1, -2):
+                    pulse_values.append((pulse_data[i] >> j) & 0x3)
+
+            pulse_values = [(val * 2 - 3) for val in pulse_values]
+        return pulse_values
+
+
+    def pack_pulse_values(pulse_values):
+        pulse_packing_mode = frame_includes.pulse_values_len.index(len(pulse_values))
+        pulse_data = [0] * frame_includes.pulse_data_len[pulse_packing_mode]
+        if pulse_packing_mode == 0:
+            pulse_values = [(val + 7) // 2 for val in pulse_values]
+            
+            for i in range(len(pulse_data)):
+                for j in range(5):
+                    shift = 16 - 3 - 3 * j
+                    pulse_data[i] += pulse_values[5*i + j] << shift
+            pulse_data[0] += (pulse_values[40] >> 2) & 1
+            pulse_data[1] += (pulse_values[40] >> 1) & 1
+            pulse_data[2] += (pulse_values[40] >> 0) & 1
+            pulse_data[3] += (pulse_values[41] >> 2) & 1
+            pulse_data[4] += (pulse_values[41] >> 1) & 1
+            pulse_data[5] += (pulse_values[41] >> 0) & 1
+        else:
+            pulse_values = [(val + 3) // 2 for val in pulse_values]
+            
+            for i in range(len(pulse_data)):
+                for j in range(8):
+                    shift = 16 - 2 - 2 * j
+                    pulse_data[i] += pulse_values[8*i + j] << shift
+        return pulse_data
 
 
     def decode(self):
@@ -52,29 +107,8 @@ class AFrameDecoder:
         print(self.aframe.scale)
         
         distance = [3, 3, 4, 5][self.pulse_packing_mode]
-        self.pulse_values = []
-        if self.pulse_packing_mode == 0:
-            for i in range(len(self.pulse_data)):
-                for j in range(16 - 3, -1, -3):
-                    self.pulse_values.append((self.pulse_data[i] >> j) & 0x7)
-            self.pulse_values.append(
-                (self.pulse_data[0] & 1) * 4 +
-                (self.pulse_data[1] & 1) * 2 +
-                (self.pulse_data[2] & 1) * 1
-            )
-            self.pulse_values.append(
-                (self.pulse_data[3] & 1) * 4 +
-                (self.pulse_data[4] & 1) * 2 +
-                (self.pulse_data[5] & 1) * 1
-            )
-
-            self.pulse_values = [(val * 2 - 7) * self.aframe.scale for val in self.pulse_values]
-        else:
-            for i in range(len(self.pulse_data)):
-                for j in range(16 - 2, -1, -2):
-                    self.pulse_values.append((self.pulse_data[i] >> j) & 0x3)
-
-            self.pulse_values = [(val * 2 - 3) * self.aframe.scale for val in self.pulse_values]
+        self.pulse_values = AFrameDecoder.unpack_pulse_values(self.pulse_packing_mode, self.pulse_data)
+        self.pulse_values = [val * self.aframe.scale for val in self.pulse_values]
 
         self.aframe.pulses = []
         for i in range(0, 128):

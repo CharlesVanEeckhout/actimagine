@@ -2,6 +2,7 @@
 from .aframe_decoder import AFrameDecoder
 
 
+
 class AFrame:
     def __init__(self, audio_extradata, prev_aframe):
         self.samples = None
@@ -34,12 +35,11 @@ class AFrame:
         writer.int_to_bits(aframe_header_word1, 16)
         writer.int_to_bits(aframe_header_word2, 16)
         
-        pulse_data = [int(x) for x in "111111121212121212121212"]
-        if len(pulse_data) != 24:
-            raise Exception("not 24 pulse")
+        pulse_values = [int(x) * 2 - 3 for x in "111111121212121212121212"]
+        if len(pulse_values) != 24:
+            raise Exception("not 24 pulse_values")
         
-        pulse_data = [pulse_data[i:i+8] for i in range(0, len(pulse_data), 8)]
+        pulse_data = pack_pulse_values(pulse_values)
         for i, word in enumerate(pulse_data):
-            word = sum([(x << (14-j*2)) for j, x in enumerate(word)])
             writer.int_to_bits(word, 16)"""
-        
+

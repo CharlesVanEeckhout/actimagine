@@ -93,3 +93,13 @@ def plane_buffer_iterator(block, planes, callback):
         for y in range(block["y"], block["y"] + block["h"], step):
             for x in range(block["x"], block["x"] + block["w"], step):
                 callback(x, y, plane)
+
+# lpc
+pulse_values_len = [
+    42, 40, 32, 24
+]
+pulse_data_len = [
+    8, 5, 4, 3
+]
+
+
