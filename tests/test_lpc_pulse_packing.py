@@ -1,3 +1,4 @@
+import pytest
 import sys
 sys.path.append('..')
 
@@ -171,7 +172,16 @@ test_cases_mode3 = [
     {"values": "222222222222222222222222", "data": [43690, 43690, 43690]},
 ]
 
-def template_test_lpc_pulse_pack(test_cases_mode, pulse_packing_mode):
+
+@pytest.mark.parametrize(
+    "test_cases_mode, pulse_packing_mode", [
+        (test_cases_mode0, 0),
+        (test_cases_mode1, 1),
+        (test_cases_mode2, 2),
+        (test_cases_mode3, 3),
+    ]
+)
+def test_lpc_pulse_pack(test_cases_mode, pulse_packing_mode):
     aframe_data_handler = AFrameDataHandler()
     pulse_max = 7 if pulse_packing_mode == 0 else 3
     for test_case in test_cases_mode:
@@ -181,23 +191,15 @@ def template_test_lpc_pulse_pack(test_cases_mode, pulse_packing_mode):
             raise Exception("data " + str(pulse_data) + " is different from expected data " + str(test_case["data"]))
 
 
-def test_lpc_pulse_pack0():
-    template_test_lpc_pulse_pack(test_cases_mode0, 0)
-
-
-def test_lpc_pulse_pack1():
-    template_test_lpc_pulse_pack(test_cases_mode1, 1)
-
-
-def test_lpc_pulse_pack2():
-    template_test_lpc_pulse_pack(test_cases_mode2, 2)
-
-
-def test_lpc_pulse_pack3():
-    template_test_lpc_pulse_pack(test_cases_mode3, 3)
-
-
-def template_test_lpc_pulse_unpack(test_cases_mode, pulse_packing_mode):
+@pytest.mark.parametrize(
+    "test_cases_mode, pulse_packing_mode", [
+        (test_cases_mode0, 0),
+        (test_cases_mode1, 1),
+        (test_cases_mode2, 2),
+        (test_cases_mode3, 3),
+    ]
+)
+def test_lpc_pulse_unpack(test_cases_mode, pulse_packing_mode):
     aframe_data_handler = AFrameDataHandler()
     pulse_max = 7 if pulse_packing_mode == 0 else 3
     for test_case in test_cases_mode:
@@ -206,20 +208,4 @@ def template_test_lpc_pulse_unpack(test_cases_mode, pulse_packing_mode):
         pulse_values = aframe_data_handler.pulse_values
         if pulse_values != expected_pulse_values:
             raise Exception("values " + str(pulse_values) + " is different from expected values " + str(expected_pulse_values))
-
-
-def test_lpc_pulse_unpack0():
-    template_test_lpc_pulse_unpack(test_cases_mode0, 0)
-
-
-def test_lpc_pulse_unpack1():
-    template_test_lpc_pulse_unpack(test_cases_mode1, 1)
-
-
-def test_lpc_pulse_unpack2():
-    template_test_lpc_pulse_unpack(test_cases_mode2, 2)
-
-
-def test_lpc_pulse_unpack3():
-    template_test_lpc_pulse_unpack(test_cases_mode3, 3)
 
