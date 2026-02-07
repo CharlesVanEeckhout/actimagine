@@ -1,4 +1,6 @@
 
+from ..aframe import AFrame
+
 
 
 class SimplePulseExtend:
@@ -6,10 +8,9 @@ class SimplePulseExtend:
         self.init_goal_audio_samples(goal_audio_samples)
         self.audio_extradata = audio_extradata
         
-        
-        self.aframe_data = []
-        for aframe_samples in self.goal_audio_samples:
-            
+        self.aframes = [AFrame() for i in self.goal_audio_samples]
+        for i in range(1, len(self.aframes)):
+            self.aframes[i].prev_aframe = self.aframes[i-1]
         
 
     def init_goal_audio_samples(self, goal_audio_samples):
@@ -20,5 +21,12 @@ class SimplePulseExtend:
 
 
     def encode(self):
-        pass
-
+        for aframe, samples in zip(self.aframes, self.goal_audio_samples):
+            samples = [samples[3*i] for i in range(42)]
+            max_amplitude = 0
+            for s in samples:
+                max_amplitude = max(max_amplitude, abs(s))
+            for i in range(len(samples)):
+                samples[i] = min(max(((samples[i] * 4) // max_amplitude) * 2 + 1, -7), 7)
+            
+            

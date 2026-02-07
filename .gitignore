@@ -7,6 +7,4 @@
 *.json
 *.log
 
-generate_lpc_test_expected.py
-
 !doc/*

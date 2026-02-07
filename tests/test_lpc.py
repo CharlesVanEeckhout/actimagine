@@ -10,6 +10,9 @@ from lpc_test_context import lpc_test_context
 def test_lpc_base():
     template_test("base")
 
+def test_lpc_scale_and_rounding():
+    template_test("scale_and_rounding")
+
 
 def template_test(key):
     expected_list = lpc_test_expected[key]
