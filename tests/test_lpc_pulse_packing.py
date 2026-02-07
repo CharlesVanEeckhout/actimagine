@@ -1,7 +1,7 @@
 import sys
 sys.path.append('..')
 
-from package.aframe_decoder import AFrameDecoder
+from package.aframe_data_handler import AFrameDataHandler
 
 
 test_cases_mode0 = [
@@ -171,67 +171,55 @@ test_cases_mode3 = [
     {"values": "222222222222222222222222", "data": [43690, 43690, 43690]},
 ]
 
-
-def test_lpc_pulse_pack0():
-    for test_case in test_cases_mode0:
-        pulse_values = [int(val) * 2 - 7 for val in test_case["values"]]
-        pulse_data = AFrameDecoder.pack_pulse_values(pulse_values)
+def template_test_lpc_pulse_pack(test_cases_mode, pulse_packing_mode):
+    aframe_data_handler = AFrameDataHandler()
+    pulse_max = 7 if pulse_packing_mode == 0 else 3
+    for test_case in test_cases_mode:
+        aframe_data_handler.pulse_values = [int(val) * 2 - pulse_max for val in test_case["values"]]
+        pulse_data = aframe_data_handler.pack_pulse_values(pulse_packing_mode)
         if pulse_data != test_case["data"]:
             raise Exception("data " + str(pulse_data) + " is different from expected data " + str(test_case["data"]))
+
+
+def test_lpc_pulse_pack0():
+    template_test_lpc_pulse_pack(test_cases_mode0, 0)
 
 
 def test_lpc_pulse_pack1():
-    for test_case in test_cases_mode1:
-        pulse_values = [int(val) * 2 - 3 for val in test_case["values"]]
-        pulse_data = AFrameDecoder.pack_pulse_values(pulse_values)
-        if pulse_data != test_case["data"]:
-            raise Exception("data " + str(pulse_data) + " is different from expected data " + str(test_case["data"]))
+    template_test_lpc_pulse_pack(test_cases_mode1, 1)
 
 
 def test_lpc_pulse_pack2():
-    for test_case in test_cases_mode2:
-        pulse_values = [int(val) * 2 - 3 for val in test_case["values"]]
-        pulse_data = AFrameDecoder.pack_pulse_values(pulse_values)
-        if pulse_data != test_case["data"]:
-            raise Exception("data " + str(pulse_data) + " is different from expected data " + str(test_case["data"]))
+    template_test_lpc_pulse_pack(test_cases_mode2, 2)
 
 
 def test_lpc_pulse_pack3():
-    for test_case in test_cases_mode3:
-        pulse_values = [int(val) * 2 - 3 for val in test_case["values"]]
-        pulse_data = AFrameDecoder.pack_pulse_values(pulse_values)
-        if pulse_data != test_case["data"]:
-            raise Exception("data " + str(pulse_data) + " is different from expected data " + str(test_case["data"]))
+    template_test_lpc_pulse_pack(test_cases_mode3, 3)
+
+
+def template_test_lpc_pulse_unpack(test_cases_mode, pulse_packing_mode):
+    aframe_data_handler = AFrameDataHandler()
+    pulse_max = 7 if pulse_packing_mode == 0 else 3
+    for test_case in test_cases_mode:
+        expected_pulse_values = [int(val) * 2 - pulse_max for val in test_case["values"]]
+        aframe_data_handler.unpack_pulse_values(pulse_packing_mode, test_case["data"])
+        pulse_values = aframe_data_handler.pulse_values
+        if pulse_values != expected_pulse_values:
+            raise Exception("values " + str(pulse_values) + " is different from expected values " + str(expected_pulse_values))
 
 
 def test_lpc_pulse_unpack0():
-    for test_case in test_cases_mode0:
-        expected_pulse_values = [int(val) * 2 - 7 for val in test_case["values"]]
-        pulse_values = AFrameDecoder.unpack_pulse_values(0, test_case["data"])
-        if pulse_values != expected_pulse_values:
-            raise Exception("values " + str(pulse_values) + " is different from expected values " + str(expected_pulse_values))
+    template_test_lpc_pulse_unpack(test_cases_mode0, 0)
 
 
 def test_lpc_pulse_unpack1():
-    for test_case in test_cases_mode1:
-        expected_pulse_values = [int(val) * 2 - 3 for val in test_case["values"]]
-        pulse_values = AFrameDecoder.unpack_pulse_values(1, test_case["data"])
-        if pulse_values != expected_pulse_values:
-            raise Exception("values " + str(pulse_values) + " is different from expected values " + str(expected_pulse_values))
+    template_test_lpc_pulse_unpack(test_cases_mode1, 1)
 
 
 def test_lpc_pulse_unpack2():
-    for test_case in test_cases_mode2:
-        expected_pulse_values = [int(val) * 2 - 3 for val in test_case["values"]]
-        pulse_values = AFrameDecoder.unpack_pulse_values(2, test_case["data"])
-        if pulse_values != expected_pulse_values:
-            raise Exception("values " + str(pulse_values) + " is different from expected values " + str(expected_pulse_values))
+    template_test_lpc_pulse_unpack(test_cases_mode2, 2)
 
 
 def test_lpc_pulse_unpack3():
-    for test_case in test_cases_mode3:
-        expected_pulse_values = [int(val) * 2 - 3 for val in test_case["values"]]
-        pulse_values = AFrameDecoder.unpack_pulse_values(3, test_case["data"])
-        if pulse_values != expected_pulse_values:
-            raise Exception("values " + str(pulse_values) + " is different from expected values " + str(expected_pulse_values))
+    template_test_lpc_pulse_unpack(test_cases_mode3, 3)
 

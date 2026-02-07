@@ -27,9 +27,8 @@ def run_or_exit(args, err):
 def get_ff_data(callback_context_tweaker):
     # get aframe data
     audio_extradata = lpc_test.get_default_audio_extradata()
-    aframe_data_object = lpc_test.get_default_aframe_data_object()
-    callback_context_tweaker(aframe_data_object, audio_extradata)
-    aframe_data = lpc_test.get_aframe_data(aframe_data_object)
+    aframe_data_handlers = callback_context_tweaker(lpc_test.get_default_aframe_data_object, audio_extradata)
+    aframe_data_list = [aframe_data_handler.pack() for aframe_data_handler in aframe_data_handlers]
     
     act = ActImagine()
     act.set_properties({
@@ -63,7 +62,7 @@ def get_ff_data(callback_context_tweaker):
     vframe_data = writer.get_data_bytes()
     
     # append aframe data
-    avframe.data = vframe_data + aframe_data
+    avframe.data = vframe_data + [byte for aframe_data in aframe_data_list for byte in aframe_data]
     
     # save vxnew
     data_new = act.save_vx()

@@ -2,6 +2,7 @@ import math
 import logging
 
 from . import frame_includes
+from .aframe_data_handler import AFrameDataHandler
 
 logger = logging.getLogger(__name__)
 logger.propagate = True # enable/disable
@@ -23,21 +24,6 @@ class AFrameDecoder:
         print("aframe")
         self.data_handler = AFrameDataHandler()
         self.data_handler.unpack_from_reader(self.reader)
-        """aframe_header_word1 = self.reader.int_from_bits(16)
-        aframe_header_word2 = self.reader.int_from_bits(16)
-        self.prev_frame_offset = (aframe_header_word1 >> 9) & 0x7f
-        self.scale_modifier_index = (aframe_header_word1 >> 6) & 0x7
-        self.pulse_start_position = (aframe_header_word2 >> 14) & 0x3
-        self.pulse_packing_mode = (aframe_header_word2 >> 12) & 0x3
-        self.lpc_codebook_indexes = [
-            (aframe_header_word1 >> 0) & 0x3f,
-            (aframe_header_word2 >> 6) & 0x3f,
-            (aframe_header_word2 >> 0) & 0x3f
-        ]
-        
-        pulse_data = []
-        for i in range([8, 5, 4, 3][self.pulse_packing_mode]):
-            pulse_data.append(self.reader.int_from_bits(16))"""
 
         if self.aframe.prev_aframe is not None:
             self.aframe.scale = self.aframe.prev_aframe.scale
@@ -49,7 +35,7 @@ class AFrameDecoder:
             self.aframe.scale /= 0x10
         
         print(self.data_handler.prev_frame_offset)
-        print(self.aframe.audio_extradata["scale_modifiers"][self.scale_modifier_index])
+        print(self.aframe.audio_extradata["scale_modifiers"][self.data_handler.scale_modifier_index])
         print(self.aframe.scale)
         
         distance = self.data_handler.get_pulse_distance()

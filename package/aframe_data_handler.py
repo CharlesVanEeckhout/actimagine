@@ -2,7 +2,6 @@
 from package import io
 
 
-# lpc
 pulse_values_len = [
     42, 40, 32, 24
 ]
@@ -22,7 +21,7 @@ class AFrameDataHandler:
         self.pulse_values = None
     
     
-    def unpack_pulse_values(pulse_packing_mode, pulse_data):
+    def unpack_pulse_values(self, pulse_packing_mode, pulse_data):
         self.pulse_values = []
         if pulse_packing_mode == 0:
             for i in range(len(pulse_data)):
@@ -49,7 +48,7 @@ class AFrameDataHandler:
 
 
     def pack_pulse_values(self, pulse_packing_mode):
-        pulse_data = [0] * frame_includes.pulse_data_len[pulse_packing_mode]
+        pulse_data = [0] * pulse_data_len[pulse_packing_mode]
         if pulse_packing_mode == 0:
             self.pulse_values = [(val + 7) // 2 for val in self.pulse_values]
             
@@ -86,7 +85,7 @@ class AFrameDataHandler:
         return pulse_packing_mode
     
     
-    def pack_header(self, writer):
+    def pack_header(self, writer, pulse_packing_mode):
         aframe_header_word1 = \
             (self.prev_frame_offset << 9) + \
             (self.scale_modifier_index << 6) + \
@@ -101,12 +100,12 @@ class AFrameDataHandler:
     
     
     def unpack_from_reader(self, reader):
-        aframe_header_word1 = self.reader.int_from_bits(16)
-        aframe_header_word2 = self.reader.int_from_bits(16)
+        aframe_header_word1 = reader.int_from_bits(16)
+        aframe_header_word2 = reader.int_from_bits(16)
         pulse_packing_mode = self.unpack_header(aframe_header_word1, aframe_header_word2)
         pulse_data = []
         for i in range(pulse_data_len[pulse_packing_mode]):
-            pulse_data.append(self.reader.int_from_bits(16))
+            pulse_data.append(reader.int_from_bits(16))
         self.unpack_pulse_values(pulse_packing_mode, pulse_data)
     
     
@@ -115,7 +114,7 @@ class AFrameDataHandler:
         
         writer = io.BitStreamWriter()
         
-        self.pack_header(writer)
+        self.pack_header(writer, pulse_packing_mode)
         
         pulse_data = self.pack_pulse_values(pulse_packing_mode)
         for word in pulse_data:
