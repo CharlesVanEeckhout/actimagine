@@ -117,6 +117,7 @@ class AFrameDataHandler:
         self.pack_header(writer, pulse_packing_mode)
         
         pulse_data = self.pack_pulse_values(pulse_packing_mode)
+        print(pulse_data)
         for word in pulse_data:
             writer.int_to_bits(word, 16)
         
