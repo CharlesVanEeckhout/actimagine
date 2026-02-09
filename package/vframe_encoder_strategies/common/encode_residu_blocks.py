@@ -8,21 +8,59 @@ logger = logging.getLogger(__name__)
 logger.propagate = True # enable/disable
 
 
-def encode_residu_blocks(self, block):
+def encode_residu_blocks_check(self, block):
+    check_result = {
+        "check_results": [],
+        "is_worth_encoding": False
+    }
     for y in range(0, block["h"], 8):
         for x in range(0, block["w"], 8):
-            encode_residu_block(self, block["x"]+x, block["y"]+y)
+            cr = encode_residu_block_check(self, block["x"]+x, block["y"]+y)
+            check_result["check_results"].append(cr)
+            check_result["is_worth_encoding"] = (check_result["is_worth_encoding"] or cr["is_worth_encoding"])
+
+    return check_result
+
+def encode_residu_blocks_write(self, check_result):
+    for cr in check_result["check_results"]:
+        encode_residu_block_write(self, cr)
 
 
-def encode_residu_block(self, x, y):
+def encode_residu_block_check(self, x, y):
+    check_result = {
+        "x": x,
+        "y": y
+    }
+
     # calculate the levels
-    level_y00 = encode_dct(self, x  , y  , "y")
-    level_y01 = encode_dct(self, x+4, y  , "y")
-    level_y10 = encode_dct(self, x  , y+4, "y")
-    level_y11 = encode_dct(self, x+4, y+4, "y")
-    level_u = encode_dct(self, x, y, "u")
-    level_v = encode_dct(self, x, y, "v")
-    
+    check_result["level_y00"] = encode_dct(self, x  , y  , "y")
+    check_result["level_y01"] = encode_dct(self, x+4, y  , "y")
+    check_result["level_y10"] = encode_dct(self, x  , y+4, "y")
+    check_result["level_y11"] = encode_dct(self, x+4, y+4, "y")
+    check_result["level_u"] = encode_dct(self, x, y, "u")
+    check_result["level_v"] = encode_dct(self, x, y, "v")
+
+    check_result["residu_mask"] = \
+        any(check_result["level_y00"]) * 1 + \
+        any(check_result["level_y01"]) * 2 + \
+        any(check_result["level_y10"]) * 4 + \
+        any(check_result["level_y11"]) * 8 + \
+        any(check_result["level_u"] + check_result["level_v"]) * 16
+
+    check_result["is_worth_encoding"] = (check_result["residu_mask"] != 0)
+
+    return check_result
+
+def encode_residu_block_write(self, check_result):
+    x = check_result["x"]
+    y = check_result["y"]
+    level_y00 = check_result["level_y00"]
+    level_y01 = check_result["level_y01"]
+    level_y10 = check_result["level_y10"]
+    level_y11 = check_result["level_y11"]
+    level_u = check_result["level_u"]
+    level_v = check_result["level_v"]
+
     # apply levels to actual_plane_buffers
     VFrameDecoder.decode_dct(self, x  , y  , "y", level_y00)
     VFrameDecoder.decode_dct(self, x+4, y  , "y", level_y01)
@@ -30,18 +68,12 @@ def encode_residu_block(self, x, y):
     VFrameDecoder.decode_dct(self, x+4, y+4, "y", level_y11)
     VFrameDecoder.decode_dct(self, x, y, "u", level_u)
     VFrameDecoder.decode_dct(self, x, y, "v", level_v)
-    
+
     # encode residu
-    residu_mask = \
-        any(level_y00) * 1 + \
-        any(level_y01) * 2 + \
-        any(level_y10) * 4 + \
-        any(level_y11) * 8 + \
-        any(level_u + level_v) * 16
-    
+    residu_mask = check_result["residu_mask"]
     residu_mask_tab_index = ff_actimagine_vx_residu_mask_new_tab.index(residu_mask)
     self.writer.unsigned_expgolomb(residu_mask_tab_index)
-    
+
     if residu_mask & 1 != 0:
         coeff_left = self.coeff_buffer_getter("y", x  -1, y    )
         coeff_top  = self.coeff_buffer_getter("y", x    , y  -1)
@@ -50,7 +82,7 @@ def encode_residu_block(self, x, y):
         self.coeff_buffer_setter("y", x  , y  , out_total_coeff)
     else:
         self.coeff_buffer_setter("y", x  , y  , 0)
-    
+
     if residu_mask & 2 != 0:
         coeff_left = self.coeff_buffer_getter("y", x+4-1, y    )
         coeff_top  = self.coeff_buffer_getter("y", x+4  , y  -1)
@@ -59,7 +91,7 @@ def encode_residu_block(self, x, y):
         self.coeff_buffer_setter("y", x+4, y  , out_total_coeff)
     else:
         self.coeff_buffer_setter("y", x+4, y  , 0)
-    
+
     if residu_mask & 4 != 0:
         coeff_left = self.coeff_buffer_getter("y", x  -1, y+4  )
         coeff_top  = self.coeff_buffer_getter("y", x    , y+4-1)
@@ -68,7 +100,7 @@ def encode_residu_block(self, x, y):
         self.coeff_buffer_setter("y", x  , y+4, out_total_coeff)
     else:
         self.coeff_buffer_setter("y", x  , y+4, 0)
-    
+
     if residu_mask & 8 != 0:
         coeff_left = self.coeff_buffer_getter("y", x+4-1, y+4  )
         coeff_top  = self.coeff_buffer_getter("y", x+4  , y+4-1)
@@ -77,7 +109,7 @@ def encode_residu_block(self, x, y):
         self.coeff_buffer_setter("y", x+4, y+4, out_total_coeff)
     else:
         self.coeff_buffer_setter("y", x+4, y+4, 0)
-    
+
     if residu_mask & 16 != 0:
         coeff_left = self.coeff_buffer_getter("uv", x-1, y  )
         coeff_top  = self.coeff_buffer_getter("uv", x  , y-1)
@@ -244,3 +276,4 @@ def encode_residu_cavlc(self, x, y, level, nc, plane):
 
         zeros_left -= run_before
     return total_coeff
+

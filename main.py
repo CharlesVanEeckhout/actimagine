@@ -5,8 +5,9 @@ import logging
 from package.actimagine import ActImagine
 from package.vframe import VFrame
 import package.io as io
-from package.vframe_encoder_strategies import KeyframeOnlySimple
+from package.vframe_encoder_strategies import SimpleKeyframeOnly
 from package.vframe_convert import convert_image_to_frame
+from package.aframe_encoder_strategies import SimplePulseExtend
 
 
 def load_vx_and_export_vxfolder(args):
@@ -30,15 +31,16 @@ def import_vxfolder_and_save_vx(args):
     for i, _ in enumerate(import_vxfolder_iter):
         print(f"importing vx folder: frame {i+1}/???")
     print("importing vx folder: complete")
-    vframe_strategy = KeyframeOnlySimple()
+    vframe_strategy = SimpleKeyframeOnly()
+    aframe_strategy = SimplePulseExtend()
+    aframe_strategy.init_audio_extradata(act.audio_extradata)
     for i, avframe in enumerate(act.avframes):
-        avframe.encode(avframe.vframe.plane_buffers, vframe_strategy)
+        avframe.encode(avframe.vframe.plane_buffers, vframe_strategy, aframe_strategy)
         print(f"encoding vx folder: frame {i+1}/{act.frames_qty}")
     print("encoding vx folder: complete")
     data_new = act.save_vx()
     with open(args.filename+"new", "wb") as f:
         f.write(bytes(data_new))
-    
 
 
 def load_vx_and_save_vx(args):
@@ -63,7 +65,7 @@ def reencode_first_frame(args):
         plane_buffers = convert_image_to_frame(im)
     vframe = VFrame(im_width, im_height, [None, None, None], act.qtab)
     writer = io.BitStreamWriter()
-    vframe.encode(writer, plane_buffers, KeyframeOnlySimple())
+    vframe.encode(writer, plane_buffers, SimpleKeyframeOnly())
     reader = io.DataReader()
     data_bytes = writer.get_data_bytes()
     reader.set_data_bytes([byte for i in range(0, len(data_bytes)-1, 2) for byte in reversed(data_bytes[i:i+2])], bitorder="big")
@@ -77,7 +79,7 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
 
-    reencode_first_frame(args)
+    load_vx_and_export_vxfolder(args)
 
 
 if __name__ == "__main__":

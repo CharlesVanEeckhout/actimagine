@@ -1,1 +1,1 @@
-from .keyframeonly_simple import KeyframeOnlySimple
+from .simple_keyframeonly import SimpleKeyframeOnly

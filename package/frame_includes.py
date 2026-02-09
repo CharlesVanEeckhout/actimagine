@@ -93,3 +93,6 @@ def plane_buffer_iterator(block, planes, callback):
         for y in range(block["y"], block["y"] + block["h"], step):
             for x in range(block["x"], block["x"] + block["w"], step):
                 callback(x, y, plane)
+
+
+

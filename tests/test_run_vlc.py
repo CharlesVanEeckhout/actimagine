@@ -10,7 +10,7 @@ def test_run_vlc_1():
         {"gb_buffer": "000", "code": 1, "end_index": 1},
         {"gb_buffer": "100", "code": 0, "end_index": 1},
     ]
-    
+
     vlc_test(expected_results, vlc.run_vlc[1])
 
 def test_run_vlc_2():
@@ -19,7 +19,7 @@ def test_run_vlc_2():
         {"gb_buffer": "010", "code": 1, "end_index": 2},
         {"gb_buffer": "100", "code": 0, "end_index": 1},
     ]
-    
+
     vlc_test(expected_results, vlc.run_vlc[2])
 
 def test_run_vlc_3():
@@ -29,7 +29,7 @@ def test_run_vlc_3():
         {"gb_buffer": "100", "code": 1, "end_index": 2},
         {"gb_buffer": "110", "code": 0, "end_index": 2},
     ]
-    
+
     vlc_test(expected_results, vlc.run_vlc[3])
 
 def test_run_vlc_4():
@@ -40,7 +40,7 @@ def test_run_vlc_4():
         {"gb_buffer": "100", "code": 1, "end_index": 2},
         {"gb_buffer": "110", "code": 0, "end_index": 2},
     ]
-    
+
     vlc_test(expected_results, vlc.run_vlc[4])
 
 def test_run_vlc_5():
@@ -52,7 +52,7 @@ def test_run_vlc_5():
         {"gb_buffer": "100", "code": 1, "end_index": 2},
         {"gb_buffer": "110", "code": 0, "end_index": 2},
     ]
-    
+
     vlc_test(expected_results, vlc.run_vlc[5])
 
 def test_run_vlc_6():
@@ -65,7 +65,7 @@ def test_run_vlc_6():
         {"gb_buffer": "101", "code": 5, "end_index": 3},
         {"gb_buffer": "110", "code": 0, "end_index": 2},
     ]
-    
+
     vlc_test(expected_results, vlc.run_vlc[6])
 
 def test_run7_vlc():
@@ -88,6 +88,6 @@ def test_run7_vlc():
         {"gb_buffer": "110000000000", "code": 1, "end_index": 3},
         {"gb_buffer": "111000000000", "code": 0, "end_index": 3},
     ]
-    
+
     vlc_test(expected_results, vlc.run7_vlc)
 

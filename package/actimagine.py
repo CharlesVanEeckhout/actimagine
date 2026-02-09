@@ -1,8 +1,9 @@
 # code adapted from https://lists.ffmpeg.org/pipermail/ffmpeg-devel/2021-March/277989.html
 
 import os
+import math
 import numpy as np
-import wave
+from scipy.io import wavfile
 import json
 from PIL import Image
 import logging
@@ -45,7 +46,7 @@ class ActImagine_LoadVXIterator:
         frame_data_size = self.reader.int_from_bytes(2)
         aframes_qty = self.reader.int_from_bytes(2)
         avframe.init_vframe(
-            self.actimagine.frame_width, self.actimagine.frame_height, 
+            self.actimagine.frame_width, self.actimagine.frame_height,
             self.ref_vframes, self.actimagine.qtab
         )
         avframe.init_aframes(aframes_qty, self.actimagine.audio_extradata, self.prev_aframe)
@@ -75,13 +76,9 @@ class ActImagine_ExportVXFolderIterator:
     def __next__(self):
         if len(self.avframes) == 0:
             if self.audio_streams_qty > 0:
-                # todo: when audio decode is complete, remove volume amplify
-                self.audio_samples *= 0x7fffffff // np.max(np.abs(self.audio_samples), axis=0)
-                with wave.open(os.path.join(self.folder_path, "fullaudio.wav"), "w") as f:
-                    f.setnchannels(1)
-                    f.setsampwidth(4)
-                    f.setframerate(self.audio_sample_rate)
-                    f.writeframes(self.audio_samples.tobytes())
+                # todo: clip audio to [-1, 1]
+                self.audio_samples *= 8
+                wavfile.write(os.path.join(self.folder_path, "fullaudio.wav"), self.audio_sample_rate, self.audio_samples)
             raise StopIteration
         avframe = self.avframes.pop(0)
         avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))
@@ -95,10 +92,13 @@ class ActImagine_ExportVXFolderIterator:
 
 
 class ActImagine_ImportVXFolderIterator:
-    def __init__(self, actimagine, folder_path):
+    def __init__(self, actimagine, folder_path, wav_data):
         self.actimagine = actimagine
         self.folder_path = folder_path
+        self.wav_data = wav_data
         self.ref_vframes = [None, None, None]
+        self.aframe_time_diff = 0
+        self.prev_aframe = None
 
 
     def __iter__(self):
@@ -117,7 +117,19 @@ class ActImagine_ImportVXFolderIterator:
         avframe = AVFrame()
         self.actimagine.avframes.append(avframe)
         avframe.init_vframe(self.actimagine.frame_width, self.actimagine.frame_height, self.ref_vframes, self.actimagine.qtab)
-        avframe.init_aframes(0, self.actimagine.audio_extradata, None)
+        if len(self.wav_data) > 0:
+            self.aframe_time_diff += 1 / self.actimagine.frame_rate
+            # todo: check if it's floor or ceil in real vx
+            aframe_qty = math.floor(self.aframe_time_diff * self.actimagine.audio_sample_rate / 128)
+            aframe_qty = min(aframe_qty, len(self.wav_data))
+            self.aframe_time_diff -= aframe_qty * 128 / self.actimagine.audio_sample_rate
+            avframe.init_aframes(aframe_qty, self.actimagine.audio_extradata, self.prev_aframe)
+            for aframe, s in zip(avframe.aframes, self.wav_data):
+                aframe.samples = s
+            self.prev_aframe = avframe.aframes[len(avframe.aframes)-1]
+            self.wav_data = self.wav_data[aframe_qty:]
+        else:
+            avframe.init_aframes(0, self.actimagine.audio_extradata, self.prev_aframe)
         avframe.vframe.plane_buffers = convert_image_to_frame(image)
         self.ref_vframes = [avframe.vframe] + self.ref_vframes[:-1]
 
@@ -231,24 +243,31 @@ class ActImagine:
         data_audio_extradata += (self.audio_extradata["scale_initial"]).to_bytes(4, byteorder="little")
 
         data_seek_table = bytearray()
-
-        self.seek_table_entries_qty = 0
-        for entry in self.seek_table:
-            data_seek_table += (entry["frame_id"]).to_bytes(4, byteorder="little")
-            data_seek_table += (entry["frame_offset"]).to_bytes(4, byteorder="little")
-            self.seek_table_entries_qty += 1
-
         data_avframes = bytearray()
 
+        self.seek_table_entries_qty = 0
         self.frames_qty = 0
         self.frame_data_size_max = 0
         for avframe in self.avframes:
+            while self.seek_table_entries_qty < len(self.seek_table):
+                seek_table_entry = self.seek_table[self.seek_table_entries_qty]
+                if seek_table_entry["frame_id"] == self.frames_qty:
+                    seek_table_entry["frame_offset"] = 12*4 + len(data_avframes)
+                    data_seek_table += (seek_table_entry["frame_id"]).to_bytes(4, byteorder="little")
+                    data_seek_table += (seek_table_entry["frame_offset"]).to_bytes(4, byteorder="little")
+                    self.seek_table_entries_qty += 1
+                else:
+                    break
+
             frame_data_size = len(avframe.data) + 2
             self.frame_data_size_max = max(frame_data_size + 2, self.frame_data_size_max)
             data_avframes += (frame_data_size).to_bytes(2, byteorder="little")
             data_avframes += (len(avframe.aframes)).to_bytes(2, byteorder="little")
             data_avframes += avframe.data
             self.frames_qty += 1
+
+        if self.seek_table_entries_qty < len(self.seek_table):
+            print("warning: some seek table entries were omitted from vx, because frame id was smaller than previous entry. is this normally possible?")
 
         self.audio_extradata_offset = 12*4 + len(data_avframes)
         self.seek_table_offset = 12*4 + len(data_avframes) + len(data_audio_extradata)
@@ -314,7 +333,21 @@ class ActImagine:
             properties_jsonstr = f.read()
         properties = json.loads(properties_jsonstr)
         self.set_properties(properties)
-        self.audio_streams_qty = 0 # audio is not supported yet
+        wav_data = []
+        if self.audio_streams_qty > 0:
+            samplerate, wav_data = wavfile.read(os.path.join(folder_path, "fullaudio.wav"))
+            if samplerate != self.audio_sample_rate:
+                raise RuntimeError("properties sample rate does not match wav sample rate")
+            if len(wav_data.shape) > 1:
+                if wav_data.shape[1] > 2:
+                    raise RuntimeError("can only support mono or stereo, not more channels")
+                raise NotImplementedError("stereo not implemented")
+            if wav_data.dtype != np.int16:
+                raise RuntimeError("can only support int16 samples")
+            wav_data_pad_shape = list(wav_data.shape)
+            wav_data_pad_shape[0] = (-wav_data.shape[0]) & 0x7f
+            wav_data = np.append(wav_data, np.zeros(wav_data_pad_shape, dtype=wav_data.dtype))
+            wav_data = np.split(wav_data, wav_data.shape[0] / 128)
         self.frames_qty = 0
         self.frame_width = 0
         self.frame_height = 0
@@ -326,6 +359,6 @@ class ActImagine:
         self.frame_width, self.frame_height = image.size
         if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
             raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
-        
-        return ActImagine_ImportVXFolderIterator(self, folder_path)
+
+        return ActImagine_ImportVXFolderIterator(self, folder_path, wav_data)
 
