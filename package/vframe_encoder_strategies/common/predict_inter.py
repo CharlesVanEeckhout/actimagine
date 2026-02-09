@@ -24,7 +24,7 @@ def encode_predict_inter_check(self, block, pred_vec, error_threshold):
     }
     if self.vframe.ref_vframes[0] is None:
         return check_result
-    
+
     # try with frame 0 first, can use dc
     error_dicts = [block_matching_fourstepsearch(self, self.vframe.ref_vframes[0], block, block_matching_get_error_dc)]
     # the others can't use dc
@@ -32,7 +32,7 @@ def encode_predict_inter_check(self, block, pred_vec, error_threshold):
         error_dicts.append(block_matching_fourstepsearch(self, self.vframe.ref_vframes[1], block, block_matching_get_error))
         if self.vframe.ref_vframes[2] is not None:
             error_dicts.append(block_matching_fourstepsearch(self, self.vframe.ref_vframes[2], block, block_matching_get_error))
-    
+
     # determine which frame is better
     min_error = 1e1000
     min_i = -1
@@ -40,9 +40,9 @@ def encode_predict_inter_check(self, block, pred_vec, error_threshold):
         if error_dict["min_error"] < min_error:
             min_error = error_dict["min_error"]
             min_i = i
-    
+
     min_error /= block["w"] * block["h"]
-    
+
     check_result["is_worth_encoding"] = (min_error > error_threshold)
     check_result["error_dict"] = error_dicts[min_i]
     check_result["min_i"] = min_i
@@ -53,16 +53,16 @@ def encode_predict_inter_write(self, check_result):
     min_i = check_result["min_i"]
     block = check_result["block"]
     pred_vec = check_result["pred_vec"]
-    
+
     # copy ref block to self.vframe
     ref_vframe = self.vframe.ref_vframes[min_i]
     def predict_inter_callback(x, y, plane):
         self.vframe.plane_buffer_setter(plane, x, y,
             ref_vframe.plane_buffer_getter(plane, x-block["x"]+error_dict["min_block"]["x"], y-block["y"]+error_dict["min_block"]["y"])
         )
-    
+
     plane_buffer_iterator(block, "yuv", predict_inter_callback)
-    
+
     # dc
     is_dc = (min_i == 0)
     if min_i == 0:
@@ -70,7 +70,7 @@ def encode_predict_inter_write(self, check_result):
         if min_dc["y"] == 0 and min_dc["u"] == 0 and min_dc["v"] == 0:
             # dont use dc for frame 0
             is_dc = False
-    
+
     # delta
     delta = {
         "x": error_dict["min_block"]["x"] - block["x"],
@@ -80,11 +80,11 @@ def encode_predict_inter_write(self, check_result):
         delta["x"] -= pred_vec["x"]
         delta["y"] -= pred_vec["y"]
     has_delta = is_dc or (delta["x"] != 0 or delta["y"] != 0)
-    
+
     # get residu
     residu_cr = encode_residu_blocks_check(self, block)
     has_residu = residu_cr["is_worth_encoding"]
-    
+
     # get mode
     mode = None
     if is_dc:
@@ -95,19 +95,19 @@ def encode_predict_inter_write(self, check_result):
         mode = [9, 20, 5, 17][has_residu*1 + has_delta*2]
     elif min_i == 2:
         mode = [14, 21, 6, 18][has_residu*1 + has_delta*2]
-    
+
     # encode predict_inter
     self.writer.unsigned_expgolomb(mode)
-    
+
     if has_delta:
         self.writer.signed_expgolomb(delta["x"])
         self.writer.signed_expgolomb(delta["y"])
-    
+
     if is_dc:
         self.writer.signed_expgolomb(error_dict["min_dc"]["y"] // 2)
         self.writer.signed_expgolomb(error_dict["min_dc"]["u"] // 2)
         self.writer.signed_expgolomb(error_dict["min_dc"]["v"] // 2)
-    
+
     # encode residu
     if has_residu:
         encode_residu_blocks_write(self, residu_cr)
@@ -127,12 +127,12 @@ def block_matching_fourstepsearch(self, ref_vframe, block, get_error):
         if x < 0 or x >= ref_vframe.width:
             continue
         search_x.append(x)
-    
+
     center_y = block["y"]
     center_x = block["x"]
     error_dict = {}
     min_error_dict_key = f"{block["x"]},{block["y"]},{block["w"]},{block["h"]}"
-    
+
     while True:
         block_matching_3x3_check(self, ref_vframe, block, error_dict, center_x, center_y, 2)
         if min_error_dict_key == error_dict["min_key"]:
@@ -142,7 +142,7 @@ def block_matching_fourstepsearch(self, ref_vframe, block, get_error):
             center_y = error_dict["min_block"]["y"]
         if error_dict["min_block"]["x"] in search_x:
             center_x = error_dict["min_block"]["x"]
-    
+
     block_matching_3x3_check(self, ref_vframe, block, get_error, error_dict, center_x, center_y, 1)
     return error_dict
 
@@ -157,19 +157,19 @@ def block_matching_get_error(self, ref_vframe, block, error_dict):
     # don't calculate error if block is out-of-bounds
     if block["x"] < 0 or block["x"] + block["w"] >= ref_vframe.width or block["y"] < 0 or block["y"] + block["h"] >= ref_vframe.height:
         return
-    
+
     # don't calculate error if we did so already
     error_dict_key = f"{block["x"]},{block["y"]},{block["w"]},{block["h"]}"
     if error_dict_key in error_dict:
         return
-    
+
     # error must be calculated
     min_error = 1e1000
     if "min_key" in error_dict:
         min_error = error_dict[error_dict["min_key"]]
-    
+
     error = 0
-    
+
     # i will use MSE instead of SAD for error calculation, because it has higher quality according to some papers i found online
     # since all we're looking for is the min error, we can abort early if the error gets larger than min
     for y in range(block["y"], block["y"]+block["h"], 2):
@@ -187,7 +187,7 @@ def block_matching_get_error(self, ref_vframe, block, error_dict):
                 error += diff * diff
         if error >= min_error:
             break
-    
+
     error_dict[error_dict_key] = error
     if error < min_error:
         error_dict["min_key"] = error_dict_key
@@ -199,12 +199,12 @@ def block_matching_get_error_dc(self, ref_vframe, block, error_dict):
     # don't calculate error if block is out-of-bounds
     if block["x"] < 0 or block["x"] + block["w"] >= ref_vframe.width or block["y"] < 0 or block["y"] + block["h"] >= ref_vframe.height:
         return
-    
+
     # don't calculate error if we did so already
     error_dict_key = f"{block["x"]},{block["y"]},{block["w"]},{block["h"]}"
     if error_dict_key in error_dict:
         return
-    
+
     # error must be calculated
     # error is relative to dc, so dc comes first
     dc = {
@@ -224,13 +224,13 @@ def block_matching_get_error_dc(self, ref_vframe, block, error_dict):
     dc["y"] = round(dc["y"] / block["h"] / block["w"] / 2) * 2
     dc["u"] = round(dc["u"] / (block["h"]/2) / (block["w"]/2) / 2) * 2
     dc["v"] = round(dc["v"] / (block["h"]/2) / (block["w"]/2) / 2) * 2
-    
+
     min_error = 1e1000
     if "min_key" in error_dict:
         min_error = error_dict[error_dict["min_key"]]
-    
+
     error = 0
-    
+
     # i will use MSE instead of SAD for error calculation, because it has higher quality according to some papers i found online
     # since all we're looking for is the min error, we can abort early if the error gets larger than min
     for y in range(block["y"], block["y"]+block["h"], 2):
@@ -248,7 +248,7 @@ def block_matching_get_error_dc(self, ref_vframe, block, error_dict):
                 error += diff * diff
         if error >= min_error:
             break
-    
+
     error_dict[error_dict_key] = error
     if error < min_error:
         error_dict["min_key"] = error_dict_key

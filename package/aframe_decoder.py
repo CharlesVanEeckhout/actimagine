@@ -13,15 +13,13 @@ class AFrameDecoder:
         self.aframe = aframe
         self.reader = reader
         self.data_handler = AFrameDataHandler()
-        
+
         self.pulse_values = None
-        
+
         self.lpc_filter_quarters = None
 
 
     def decode(self):
-        print()
-        print("aframe")
         self.data_handler = AFrameDataHandler()
         self.data_handler.unpack_from_reader(self.reader)
 
@@ -30,14 +28,11 @@ class AFrameDecoder:
         else:
             self.aframe.scale = self.aframe.audio_extradata["scale_initial"] * 0x2000
         self.aframe.scale *= self.aframe.audio_extradata["scale_modifiers"][self.data_handler.scale_modifier_index] / 0x2000
-        
+
         if self.aframe.scale > 0x0FFFFFFF: # debug failsafe to be removed
             self.aframe.scale /= 0x10
-        
-        print(self.data_handler.prev_frame_offset)
-        print(self.aframe.audio_extradata["scale_modifiers"][self.data_handler.scale_modifier_index])
-        print(self.aframe.scale)
-        
+
+
         distance = self.data_handler.get_pulse_distance()
         self.pulse_values = [val * self.aframe.scale for val in self.data_handler.pulse_values]
 
@@ -90,7 +85,7 @@ class AFrameDecoder:
                 self.lpc_filter_quarters[3].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
                 self.aframe.lpc_filter[i] += lpc_filter_difference[i]
 
-        
+
         prev_samples = [0, 0, 0, 0, 0, 0, 0, 0]
         self.samples = []
         if self.data_handler.prev_frame_offset < 0x7E:
@@ -105,8 +100,6 @@ class AFrameDecoder:
             for j in range(len(lpc_filter_quarter)):
                 coeff = lpc_filter_quarter[j] / 0x8000
                 prev_sample_influence = [prev_sample_influence[k] + prev_sample_influence[len(prev_sample_influence)-1-k]*coeff for k in range(len(prev_sample_influence))] + [0]
-            if i == 127:
-                print(prev_sample_influence)
             for j in range(len(lpc_filter_quarter)):
                 prev_sample_index = i - 1 - j
                 if prev_sample_index < 0:
@@ -116,5 +109,4 @@ class AFrameDecoder:
                 sample -= prev_sample * prev_sample_influence[j+1]
             self.samples.append(math.floor(sample))
         self.aframe.samples = self.samples
-        print(self.samples[0])
 

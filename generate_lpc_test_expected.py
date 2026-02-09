@@ -27,9 +27,8 @@ def run_or_exit(args, err):
 def get_ff_data(callback_context_tweaker):
     # get aframe data
     audio_extradata = lpc_test.get_default_audio_extradata()
-    aframe_data_handlers = callback_context_tweaker(lpc_test.get_default_aframe_data_object, audio_extradata)
-    aframe_data_list = [aframe_data_handler.pack() for aframe_data_handler in aframe_data_handlers]
-    
+    aframe_data_handlers = callback_context_tweaker(lpc_test.get_default_aframe_data_handler, audio_extradata)
+
     act = ActImagine()
     act.set_properties({
         "file_signature": b'VXDS',
@@ -45,9 +44,9 @@ def get_ff_data(callback_context_tweaker):
     })
     act.frame_width = 32
     act.frame_height = 32
-    
+
     avframe = AVFrame()
-    avframe.aframes = [None] # so that len(avframe.aframes) == 1
+    avframe.aframes = [None]*len(aframe_data_handlers) # so that len(avframe.aframes) is correct
     act.avframes = [avframe]
     # generate vframe data
     avframe.init_vframe(act.frame_width, act.frame_height, None, act.qtab)
@@ -59,22 +58,23 @@ def get_ff_data(callback_context_tweaker):
         "v": np.zeros((vframe.height // 2, vframe.width // 2), dtype=np.uint16)
     }
     vframe.encode(writer, goal_plane_buffers, SimpleKeyframeOnly())
-    vframe_data = writer.get_data_bytes()
-    
     # append aframe data
-    avframe.data = vframe_data + [byte for aframe_data in aframe_data_list for byte in aframe_data]
-    
+    for aframe_data_handler in aframe_data_handlers:
+        aframe_data_handler.pack_to_writer(writer)
+
+    avframe.data = writer.get_data_bytes()
+
     # save vxnew
     data_new = act.save_vx()
     with open(FILENAME_VXNEW, "wb") as f:
         f.write(bytes(data_new))
-    
+
     # load vxnew with ffmpeg
     run_or_exit(f"{FOLDER_FFMPEG_CMD}/ffmpeg -i {FILENAME_VXNEW} -c:v png -c:a pcm_s16le {FOLDER_FFMPEG_CMD}/mov00_%04d.png {FOLDER_FFMPEG_CMD}/mov00_audio.wav", "error")
-    
+
     ff_samplerate, ff_data = wavfile.read(f"{FOLDER_FFMPEG}/mov00_audio.wav")
     os.remove(f"{FOLDER_FFMPEG}/mov00_audio.wav")
-    
+
     return list(ff_data)
 
 
@@ -87,10 +87,11 @@ def main():
             file_content += f"        {ff_data},\n"
         file_content += "    ],\n"
     file_content += "}\n"
-    
+
     with open(FILENAME_EXPECTED, "w") as f:
         f.write(file_content)
 
 
 if __name__ == "__main__":
     main()
+

@@ -13,6 +13,6 @@ from lpc_test_context import lpc_test_context
 def test_lpc(key):
     expected_list = lpc_test_expected[key]
     context_list = lpc_test_context[key]
-    
+
     for expected_samples, callback_context_tweaker in zip(expected_list, context_list):
         lpc_test(expected_samples, callback_context_tweaker)

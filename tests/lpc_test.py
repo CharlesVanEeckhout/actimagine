@@ -29,7 +29,7 @@ def get_default_audio_extradata():
 
 def get_default_aframe_data_handler():
     aframe_data_handler = AFrameDataHandler()
-    
+
     aframe_data_handler.prev_frame_offset = 0x7f # 0x00 to 0x7f
     aframe_data_handler.scale_modifier_index = 0 # 0 to 7
     aframe_data_handler.pulse_start_position = 0 # 0 to 3
@@ -39,7 +39,7 @@ def get_default_aframe_data_handler():
         0x00  # 0x00 to 0x3f
     ]
     aframe_data_handler.pulse_values = [int(x) * 2 - 3 for x in "111111121212121212121212"]
-    
+
     return aframe_data_handler
 
 
@@ -47,7 +47,7 @@ def lpc_test(expected_samples, callback_context_tweaker):
     audio_extradata = get_default_audio_extradata()
     aframe_data_handlers = callback_context_tweaker(get_default_aframe_data_handler, audio_extradata)
     aframe_data_list = [aframe_data_handler.pack() for aframe_data_handler in aframe_data_handlers]
-    
+
     samples = []
     prev_aframe = None
     for aframe_data in aframe_data_list:
@@ -60,7 +60,7 @@ def lpc_test(expected_samples, callback_context_tweaker):
         s = list(np.clip(np.fix(s), -0x8000, 0x7fff))
         samples += s
         prev_aframe = aframe
-    
+
     if samples != expected_samples:
         raise Exception("samples " + str(aframe.samples) + " is different from expected samples " + str(expected_samples))
 

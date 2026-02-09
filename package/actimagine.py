@@ -46,7 +46,7 @@ class ActImagine_LoadVXIterator:
         frame_data_size = self.reader.int_from_bytes(2)
         aframes_qty = self.reader.int_from_bytes(2)
         avframe.init_vframe(
-            self.actimagine.frame_width, self.actimagine.frame_height, 
+            self.actimagine.frame_width, self.actimagine.frame_height,
             self.ref_vframes, self.actimagine.qtab
         )
         avframe.init_aframes(aframes_qty, self.actimagine.audio_extradata, self.prev_aframe)
@@ -126,7 +126,8 @@ class ActImagine_ImportVXFolderIterator:
             avframe.init_aframes(aframe_qty, self.actimagine.audio_extradata, self.prev_aframe)
             for aframe, s in zip(avframe.aframes, self.wav_data):
                 aframe.samples = s
-                self.prev_aframe = aframe
+            self.prev_aframe = avframe.aframes[len(avframe.aframes)-1]
+            self.wav_data = self.wav_data[aframe_qty:]
         else:
             avframe.init_aframes(0, self.actimagine.audio_extradata, self.prev_aframe)
         avframe.vframe.plane_buffers = convert_image_to_frame(image)
@@ -257,7 +258,7 @@ class ActImagine:
                     self.seek_table_entries_qty += 1
                 else:
                     break
-            
+
             frame_data_size = len(avframe.data) + 2
             self.frame_data_size_max = max(frame_data_size + 2, self.frame_data_size_max)
             data_avframes += (frame_data_size).to_bytes(2, byteorder="little")
@@ -358,6 +359,6 @@ class ActImagine:
         self.frame_width, self.frame_height = image.size
         if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
             raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
-        
+
         return ActImagine_ImportVXFolderIterator(self, folder_path, wav_data)
 

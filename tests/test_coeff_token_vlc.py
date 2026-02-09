@@ -72,7 +72,7 @@ def test_coeff_token_vlc_0():
         {"gb_buffer": "0100000000000000", "code": 5, "end_index": 2},
         {"gb_buffer": "1000000000000000", "code": 0, "end_index": 1},
     ]
-    
+
     vlc_test(expected_results, vlc.coeff_token_vlc[0])
 
 
@@ -149,7 +149,7 @@ def test_coeff_token_vlc_1():
         {"gb_buffer": "1000000000000000", "code": 5, "end_index": 2},
         {"gb_buffer": "1100000000000000", "code": 0, "end_index": 2},
     ]
-    
+
     vlc_test(expected_results, vlc.coeff_token_vlc[1])
 
 
@@ -282,7 +282,7 @@ def test_coeff_token_vlc_2():
         {"gb_buffer": "1110000000000000", "code": 5, "end_index": 4},
         {"gb_buffer": "1111000000000000", "code": 0, "end_index": 4},
     ]
-    
+
     vlc_test(expected_results, vlc.coeff_token_vlc[2])
 
 
@@ -2399,6 +2399,6 @@ def test_coeff_token_vlc_3():
         {"gb_buffer": "1111100000000000", "code": 66, "end_index": 6},
         {"gb_buffer": "1111110000000000", "code": 67, "end_index": 6},
     ]
-    
+
     vlc_test(expected_results, vlc.coeff_token_vlc[3])
 
