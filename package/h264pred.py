@@ -24,10 +24,10 @@ def pred4x4_128_dc(plane_buffer, dst):
 def pred4x4_top_dc(plane_buffer, dst):
     # fill the 4x4 block with average of top edge pixels
     dc = (
-        plane_buffer[dst["y"] - 1][dst["x"] + 0] +
-        plane_buffer[dst["y"] - 1][dst["x"] + 1] +
-        plane_buffer[dst["y"] - 1][dst["x"] + 2] +
-        plane_buffer[dst["y"] - 1][dst["x"] + 3] +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 0]) +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 1]) +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 2]) +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 3]) +
         2
     ) // 4
     for y in range(4):
@@ -37,10 +37,10 @@ def pred4x4_top_dc(plane_buffer, dst):
 def pred4x4_left_dc(plane_buffer, dst):
     # fill the 4x4 block with average of left edge pixels
     dc = (
-        plane_buffer[dst["y"] + 0][dst["x"] - 1] +
-        plane_buffer[dst["y"] + 1][dst["x"] - 1] +
-        plane_buffer[dst["y"] + 2][dst["x"] - 1] +
-        plane_buffer[dst["y"] + 3][dst["x"] - 1] +
+        int(plane_buffer[dst["y"] + 0][dst["x"] - 1]) +
+        int(plane_buffer[dst["y"] + 1][dst["x"] - 1]) +
+        int(plane_buffer[dst["y"] + 2][dst["x"] - 1]) +
+        int(plane_buffer[dst["y"] + 3][dst["x"] - 1]) +
         2
     ) // 4
     for y in range(4):
@@ -50,14 +50,14 @@ def pred4x4_left_dc(plane_buffer, dst):
 def pred4x4_dc(plane_buffer, dst):
     # fill the 4x4 block with average of top edge and left edge pixels
     dc = (
-        plane_buffer[dst["y"] - 1][dst["x"] + 0] +
-        plane_buffer[dst["y"] - 1][dst["x"] + 1] +
-        plane_buffer[dst["y"] - 1][dst["x"] + 2] +
-        plane_buffer[dst["y"] - 1][dst["x"] + 3] +
-        plane_buffer[dst["y"] + 0][dst["x"] - 1] +
-        plane_buffer[dst["y"] + 1][dst["x"] - 1] +
-        plane_buffer[dst["y"] + 2][dst["x"] - 1] +
-        plane_buffer[dst["y"] + 3][dst["x"] - 1] +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 0]) +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 1]) +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 2]) +
+        int(plane_buffer[dst["y"] - 1][dst["x"] + 3]) +
+        int(plane_buffer[dst["y"] + 0][dst["x"] - 1]) +
+        int(plane_buffer[dst["y"] + 1][dst["x"] - 1]) +
+        int(plane_buffer[dst["y"] + 2][dst["x"] - 1]) +
+        int(plane_buffer[dst["y"] + 3][dst["x"] - 1]) +
         4
     ) // 8
     for y in range(4):
@@ -66,15 +66,15 @@ def pred4x4_dc(plane_buffer, dst):
 
 def pred4x4_down_left(plane_buffer, dst):
     # fill the 4x4 block with smudging pixels from borders with slope of (-1,+1)
-    t0 = plane_buffer[dst["y"] - 1][dst["x"] + 0]
-    t1 = plane_buffer[dst["y"] - 1][dst["x"] + 1]
-    t2 = plane_buffer[dst["y"] - 1][dst["x"] + 2]
-    t3 = plane_buffer[dst["y"] - 1][dst["x"] + 3]
+    t0 = int(plane_buffer[dst["y"] - 1][dst["x"] + 0])
+    t1 = int(plane_buffer[dst["y"] - 1][dst["x"] + 1])
+    t2 = int(plane_buffer[dst["y"] - 1][dst["x"] + 2])
+    t3 = int(plane_buffer[dst["y"] - 1][dst["x"] + 3])
 
-    t4 = plane_buffer[dst["y"] - 1][dst["x"] + 4]
-    t5 = plane_buffer[dst["y"] - 1][dst["x"] + 5]
-    t6 = plane_buffer[dst["y"] - 1][dst["x"] + 6]
-    t7 = plane_buffer[dst["y"] - 1][dst["x"] + 7]
+    t4 = int(plane_buffer[dst["y"] - 1][dst["x"] + 4])
+    t5 = int(plane_buffer[dst["y"] - 1][dst["x"] + 5])
+    t6 = int(plane_buffer[dst["y"] - 1][dst["x"] + 6])
+    t7 = int(plane_buffer[dst["y"] - 1][dst["x"] + 7])
 
     pixels = [
         (t0 + 2*t1 + t2 + 2) // 4, # (0,0)
@@ -93,17 +93,17 @@ def pred4x4_down_left(plane_buffer, dst):
 
 def pred4x4_down_right(plane_buffer, dst):
     # fill the 4x4 block with smudging pixels from borders with slope of (+1,+1)
-    lt = plane_buffer[dst["y"] - 1][dst["x"] - 1]
+    lt = int(plane_buffer[dst["y"] - 1][dst["x"] - 1])
 
-    t0 = plane_buffer[dst["y"] - 1][dst["x"] + 0]
-    t1 = plane_buffer[dst["y"] - 1][dst["x"] + 1]
-    t2 = plane_buffer[dst["y"] - 1][dst["x"] + 2]
-    t3 = plane_buffer[dst["y"] - 1][dst["x"] + 3]
+    t0 = int(plane_buffer[dst["y"] - 1][dst["x"] + 0])
+    t1 = int(plane_buffer[dst["y"] - 1][dst["x"] + 1])
+    t2 = int(plane_buffer[dst["y"] - 1][dst["x"] + 2])
+    t3 = int(plane_buffer[dst["y"] - 1][dst["x"] + 3])
 
-    l0 = plane_buffer[dst["y"] + 0][dst["x"] - 1]
-    l1 = plane_buffer[dst["y"] + 1][dst["x"] - 1]
-    l2 = plane_buffer[dst["y"] + 2][dst["x"] - 1]
-    l3 = plane_buffer[dst["y"] + 3][dst["x"] - 1]
+    l0 = int(plane_buffer[dst["y"] + 0][dst["x"] - 1])
+    l1 = int(plane_buffer[dst["y"] + 1][dst["x"] - 1])
+    l2 = int(plane_buffer[dst["y"] + 2][dst["x"] - 1])
+    l3 = int(plane_buffer[dst["y"] + 3][dst["x"] - 1])
 
     pixels = [
         (l3 + 2*l2 + l1 + 2) // 4, # (0,3)
@@ -122,17 +122,17 @@ def pred4x4_down_right(plane_buffer, dst):
 
 def pred4x4_vertical_right(plane_buffer, dst):
     # fill the 4x4 block with smudging pixels from borders with slope of (+1,+2)
-    lt = plane_buffer[dst["y"] - 1][dst["x"] - 1]
+    lt = int(plane_buffer[dst["y"] - 1][dst["x"] - 1])
 
-    t0 = plane_buffer[dst["y"] - 1][dst["x"] + 0]
-    t1 = plane_buffer[dst["y"] - 1][dst["x"] + 1]
-    t2 = plane_buffer[dst["y"] - 1][dst["x"] + 2]
-    t3 = plane_buffer[dst["y"] - 1][dst["x"] + 3]
+    t0 = int(plane_buffer[dst["y"] - 1][dst["x"] + 0])
+    t1 = int(plane_buffer[dst["y"] - 1][dst["x"] + 1])
+    t2 = int(plane_buffer[dst["y"] - 1][dst["x"] + 2])
+    t3 = int(plane_buffer[dst["y"] - 1][dst["x"] + 3])
 
-    l0 = plane_buffer[dst["y"] + 0][dst["x"] - 1]
-    l1 = plane_buffer[dst["y"] + 1][dst["x"] - 1]
-    l2 = plane_buffer[dst["y"] + 2][dst["x"] - 1]
-    #l3 = plane_buffer[dst["y"] + 3][dst["x"] - 1]
+    l0 = int(plane_buffer[dst["y"] + 0][dst["x"] - 1])
+    l1 = int(plane_buffer[dst["y"] + 1][dst["x"] - 1])
+    l2 = int(plane_buffer[dst["y"] + 2][dst["x"] - 1])
+    #l3 = int(plane_buffer[dst["y"] + 3][dst["x"] - 1])
 
     pixels = [
         (l0 + 2*l1 + l2 + 2) // 4, # (0,3)
@@ -154,17 +154,17 @@ def pred4x4_vertical_right(plane_buffer, dst):
 
 def pred4x4_horizontal_down(plane_buffer, dst):
     # fill the 4x4 block with smudging pixels from borders with slope of (+2,+1)
-    lt = plane_buffer[dst["y"] - 1][dst["x"] - 1]
+    lt = int(plane_buffer[dst["y"] - 1][dst["x"] - 1])
 
-    t0 = plane_buffer[dst["y"] - 1][dst["x"] + 0]
-    t1 = plane_buffer[dst["y"] - 1][dst["x"] + 1]
-    t2 = plane_buffer[dst["y"] - 1][dst["x"] + 2]
-    #t3 = plane_buffer[dst["y"] - 1][dst["x"] + 3]
+    t0 = int(plane_buffer[dst["y"] - 1][dst["x"] + 0])
+    t1 = int(plane_buffer[dst["y"] - 1][dst["x"] + 1])
+    t2 = int(plane_buffer[dst["y"] - 1][dst["x"] + 2])
+    #t3 = int(plane_buffer[dst["y"] - 1][dst["x"] + 3])
 
-    l0 = plane_buffer[dst["y"] + 0][dst["x"] - 1]
-    l1 = plane_buffer[dst["y"] + 1][dst["x"] - 1]
-    l2 = plane_buffer[dst["y"] + 2][dst["x"] - 1]
-    l3 = plane_buffer[dst["y"] + 3][dst["x"] - 1]
+    l0 = int(plane_buffer[dst["y"] + 0][dst["x"] - 1])
+    l1 = int(plane_buffer[dst["y"] + 1][dst["x"] - 1])
+    l2 = int(plane_buffer[dst["y"] + 2][dst["x"] - 1])
+    l3 = int(plane_buffer[dst["y"] + 3][dst["x"] - 1])
 
     pixels = [
         (t0 + 2*t1 + t2 + 2) // 4, # (3,0)
@@ -186,15 +186,15 @@ def pred4x4_horizontal_down(plane_buffer, dst):
 
 def pred4x4_vertical_left(plane_buffer, dst):
     # fill the 4x4 block with smudging pixels from borders with slope of (-1,+2)
-    t0 = plane_buffer[dst["y"] - 1][dst["x"] + 0]
-    t1 = plane_buffer[dst["y"] - 1][dst["x"] + 1]
-    t2 = plane_buffer[dst["y"] - 1][dst["x"] + 2]
-    t3 = plane_buffer[dst["y"] - 1][dst["x"] + 3]
+    t0 = int(plane_buffer[dst["y"] - 1][dst["x"] + 0])
+    t1 = int(plane_buffer[dst["y"] - 1][dst["x"] + 1])
+    t2 = int(plane_buffer[dst["y"] - 1][dst["x"] + 2])
+    t3 = int(plane_buffer[dst["y"] - 1][dst["x"] + 3])
 
-    t4 = plane_buffer[dst["y"] - 1][dst["x"] + 4]
-    t5 = plane_buffer[dst["y"] - 1][dst["x"] + 5]
-    t6 = plane_buffer[dst["y"] - 1][dst["x"] + 6]
-    #t7 = plane_buffer[dst["y"] - 1][dst["x"] + 7]
+    t4 = int(plane_buffer[dst["y"] - 1][dst["x"] + 4])
+    t5 = int(plane_buffer[dst["y"] - 1][dst["x"] + 5])
+    t6 = int(plane_buffer[dst["y"] - 1][dst["x"] + 6])
+    #t7 = int(plane_buffer[dst["y"] - 1][dst["x"] + 7])
 
     pixels = [
         (t0 + t1 + 1) // 2,        # (0,0)
@@ -216,10 +216,10 @@ def pred4x4_vertical_left(plane_buffer, dst):
 
 def pred4x4_horizontal_up(plane_buffer, dst):
     # fill the 4x4 block with smudging pixels from borders with slope of (+2,-1)
-    l0 = plane_buffer[dst["y"] + 0][dst["x"] - 1]
-    l1 = plane_buffer[dst["y"] + 1][dst["x"] - 1]
-    l2 = plane_buffer[dst["y"] + 2][dst["x"] - 1]
-    l3 = plane_buffer[dst["y"] + 3][dst["x"] - 1]
+    l0 = int(plane_buffer[dst["y"] + 0][dst["x"] - 1])
+    l1 = int(plane_buffer[dst["y"] + 1][dst["x"] - 1])
+    l2 = int(plane_buffer[dst["y"] + 2][dst["x"] - 1])
+    l3 = int(plane_buffer[dst["y"] + 3][dst["x"] - 1])
 
     pixels = [
         (l0 + l1 + 1) // 2,        # (0,0)
