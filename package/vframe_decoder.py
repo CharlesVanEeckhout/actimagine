@@ -587,8 +587,8 @@ class VFrameDecoder:
 
     def decode(self):
         self.coeff_buffers = {
-            "y": np.zeros((self.vframe.height // 4 + 1, self.vframe.width // 4 + 1), dtype=np.uint16),
-            "uv": np.zeros((self.vframe.height // 8 + 1, self.vframe.width // 8 + 1), dtype=np.uint16)
+            "y": np.zeros((self.vframe.height // 4 + 1, self.vframe.width // 4 + 1), dtype=np.uint8),
+            "uv": np.zeros((self.vframe.height // 8 + 1, self.vframe.width // 8 + 1), dtype=np.uint8)
         }
 
         self.vectors = []
@@ -624,3 +624,4 @@ class VFrameDecoder:
         # align with word
         while self.reader.offset % 2 != 0:
             self.reader.bit()
+

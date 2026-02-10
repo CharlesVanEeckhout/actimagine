@@ -57,9 +57,9 @@ def convert_image_to_frame(image):
         raise RuntimeError("image's resolution is not a multiple of 2")
 
     frame = {
-        "y": np.zeros((frame_height, frame_width), dtype=np.uint16),
-        "u": np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint16),
-        "v": np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint16)
+        "y": np.zeros((frame_height, frame_width), dtype=np.uint8),
+        "u": np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint8),
+        "v": np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint8)
     }
 
     for y in range(0, frame["y"].shape[0], 2):
@@ -76,3 +76,4 @@ def convert_image_to_frame(image):
             frame["v"][y//2][x//2] = round((yuv00[2] + yuv01[2] + yuv10[2] + yuv11[2]) / 4)
 
     return frame
+

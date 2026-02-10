@@ -16,9 +16,9 @@ class VFrame:
 
     def decode(self, reader):
         self.plane_buffers = {
-            "y": np.zeros((self.height, self.width), dtype=np.uint16),
-            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16),
-            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16)
+            "y": np.zeros((self.height, self.width), dtype=np.uint8),
+            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8),
+            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8)
         }
         vframe_decoder = VFrameDecoder(self, reader)
         vframe_decoder.decode()
@@ -26,9 +26,9 @@ class VFrame:
 
     def encode(self, writer, goal_plane_buffers, strategy):
         self.plane_buffers = {
-            "y": np.zeros((self.height, self.width), dtype=np.uint16),
-            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16),
-            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint16)
+            "y": np.zeros((self.height, self.width), dtype=np.uint8),
+            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8),
+            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8)
         }
         vframe_encoder = VFrameEncoder(self, writer, goal_plane_buffers, strategy)
         vframe_encoder.encode()
