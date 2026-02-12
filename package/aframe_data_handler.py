@@ -1,5 +1,5 @@
 
-from package import io
+from . import io
 
 
 pulse_values_len = [
