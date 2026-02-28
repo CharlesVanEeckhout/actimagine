@@ -19,6 +19,17 @@ def callback_multiframe(get_default_aframe_data_handler, audio_extradata, frame_
     return [aframe_data_handler]*frame_qty
 
 
+def callback_multiframe_inter(get_default_aframe_data_handler, audio_extradata, frame_qty):
+    aframe_data_handlers = [get_default_aframe_data_handler(), get_default_aframe_data_handler()]
+    for aframe_data_handler in aframe_data_handlers:
+        aframe_data_handler.pulse_values = [int(x) * 2 - 3 for x in "1212121212121212121212121212121212121212"]
+        aframe_data_handler.scale_modifier_index = 3
+    aframe_data_handlers[1].prev_frame_offset = 0x00
+    audio_extradata["scale_initial"] = 0x10000000//0x2000//7
+    audio_extradata["scale_modifiers"] = [0x8000, 0x4000, 0x2000, 0x1000, 0x0800, 0, 0, 0]
+    return [aframe_data_handlers[0]] + [aframe_data_handlers[1]]*(frame_qty-1)
+
+
 def callback_simple_pulseextend_strat(get_default_aframe_data_handler, audio_extradata):
     aframe_data_handler = get_default_aframe_data_handler()
     aframe_data_handler.pulse_values = [int(x) * 2 - 7 for x in "343434340123456734343434343434343434343434"]
@@ -46,6 +57,10 @@ lpc_test_context = {
     "multiframe": [
         lambda afr, aex: callback_multiframe(afr, aex, 2),
         lambda afr, aex: callback_multiframe(afr, aex, 5),
+    ],
+    "multiframe_inter": [
+        lambda afr, aex: callback_multiframe_inter(afr, aex, 2),
+        lambda afr, aex: callback_multiframe_inter(afr, aex, 5),
     ],
     "simple_pulseextend_strat": [
         lambda afr, aex: callback_simple_pulseextend_strat(afr, aex),
