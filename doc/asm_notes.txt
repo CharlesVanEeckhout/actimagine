@@ -1,0 +1,34 @@
+DS sound registers are only accessible by sub cpu "ARM7"
+
+no$gba -> window -> i/o map -> sound
+sound channel 0, buffer of PCM16 at 02330500-023322FF (size 780*4 bytes)
+
+two aframe buffers (commit to channel): 
+    aframe_buffer_0 : 0232F0A0-0232F29F
+    aframe_buffer_1 : 0232F4A0-0232F69F
+
+two aframe buffers (temp): 
+    aframe_buffer_1t : 0232F2A0-0232F49F
+    aframe_buffer_0t : 0232F6A0-0232F89F
+
+
+01FFFD78 (ITCM:7D78): write sample to channel buffer (main cpu)
+01FFFD5C-01FFFD80
+; i : r0
+; sample : r7
+; aframe_buffer_ptr : r4 (toggles between aframe_buffer_0 and aframe_buffer_1)
+; channel_buffer_ptr : r2
+    i = 0x80
+    do
+        sample = [aframe_buffer_ptr]
+        aframe_buffer_ptr += sizeof(int32)
+        if sample > 0x00007FFF
+            sample = 0x00007FFF
+        if sample < -0x00008000
+            sample = -0x00008000
+        [channel_buffer_ptr] = (int16)sample
+        channel_buffer_ptr += sizeof(int16)
+        i--
+    while i != 0
+
+

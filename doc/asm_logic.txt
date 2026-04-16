@@ -1,0 +1,8 @@
+every avframe
+    every aframe
+        
+        ???
+        
+        the current aframe_buffer is copied to the channel's buffer
+            (implies a hard max qty of aframes per avframe: (780*4/sizeof(int16)) / 128 = 30
+             or else channel buffer overflows)
