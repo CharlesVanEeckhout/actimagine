@@ -59,10 +59,10 @@ def lpc_test(expected_samples, callback_context_tweaker):
         reader.set_data_bytes([byte for i in range(0, len(aframe_data)-1, 2) for byte in reversed(aframe_data[i:i+2])], bitorder='big')
         aframe.decode(reader)
         s = np.array(aframe.samples) / 0x2000
-        s = list(np.clip(np.fix(s), -0x8000, 0x7fff))
+        s = [int(x) for x in np.clip(np.fix(s), -0x8000, 0x7fff)]
         samples += s
         prev_aframe = aframe
 
     if samples != expected_samples:
-        raise Exception('samples ' + str(aframe.samples) + ' is different from expected samples ' + str(expected_samples))
+        raise Exception('samples ' + str(samples) + ' is different from expected samples ' + str(expected_samples))
 
