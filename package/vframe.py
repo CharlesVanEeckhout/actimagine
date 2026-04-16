@@ -16,9 +16,9 @@ class VFrame:
 
     def decode(self, reader):
         self.plane_buffers = {
-            "y": np.zeros((self.height, self.width), dtype=np.uint8),
-            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8),
-            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8)
+            'y': np.zeros((self.height, self.width), dtype=np.uint8),
+            'u': np.zeros((self.height // 2, self.width // 2), dtype=np.uint8),
+            'v': np.zeros((self.height // 2, self.width // 2), dtype=np.uint8)
         }
         vframe_decoder = VFrameDecoder(self, reader)
         vframe_decoder.decode()
@@ -26,27 +26,27 @@ class VFrame:
 
     def encode(self, writer, goal_plane_buffers, strategy):
         self.plane_buffers = {
-            "y": np.zeros((self.height, self.width), dtype=np.uint8),
-            "u": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8),
-            "v": np.zeros((self.height // 2, self.width // 2), dtype=np.uint8)
+            'y': np.zeros((self.height, self.width), dtype=np.uint8),
+            'u': np.zeros((self.height // 2, self.width // 2), dtype=np.uint8),
+            'v': np.zeros((self.height // 2, self.width // 2), dtype=np.uint8)
         }
         vframe_encoder = VFrameEncoder(self, writer, goal_plane_buffers, strategy)
         vframe_encoder.encode()
 
 
     def plane_buffer_getter(self, plane, x, y):
-        step = 1 if plane == "y" else 2
+        step = 1 if plane == 'y' else 2
         return int(self.plane_buffers[plane][y // step][x // step])
 
 
     def plane_buffer_setter(self, plane, x, y, value):
-        step = 1 if plane == "y" else 2
+        step = 1 if plane == 'y' else 2
         self.plane_buffers[plane][y // step][x // step] = value
 
 
     def export_buffers(self, filename):
-        for plane in ["y", "u", "v"]:
-            with open(f"{filename}_{plane}.bin", "wb") as f:
+        for plane in ['y', 'u', 'v']:
+            with open(f"{filename}_{plane}.bin", 'wb') as f:
                 for row in self.plane_buffers[plane]:
                     for pixel in row:
                         f.write(pixel.astype(np.uint8))

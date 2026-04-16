@@ -7,8 +7,8 @@ class DataReader:
         self.data = None
         self.offset = 0
 
-    def set_data_bytes(self, data, bitorder="little"):
-        if bitorder == "big":
+    def set_data_bytes(self, data, bitorder='little'):
+        if bitorder == 'big':
             for i in range(len(data)):
                 data[i] = int((f"{data[i]:08b}")[::-1], 2)
         self.data_size = len(data)
@@ -27,7 +27,7 @@ class DataReader:
 
     def bit(self):
         if self.offset + 1/8 > self.data_size:
-            raise RuntimeError("tried to read out of bounds")
+            raise RuntimeError('tried to read out of bounds')
         bit_number = int(self.offset * 8) & 7
         bit = (self.data[int(self.offset)] >> bit_number) & 1
         self.offset += 1/8
@@ -41,7 +41,7 @@ class DataReader:
 
     def byte(self):
         if self.offset + 1 > self.data_size:
-            raise RuntimeError("tried to read out of bounds")
+            raise RuntimeError('tried to read out of bounds')
         self.offset += 1
         if self.offset % 1 == 0:
             return self.data[self.offset-1]
@@ -55,9 +55,9 @@ class DataReader:
             bytes.append(self.byte())
         return bytes
 
-    def int_from_bits(self, bit_qty, bitorder="little", signed=False):
+    def int_from_bits(self, bit_qty, bitorder='little', signed=False):
         bits = self.bits(bit_qty)
-        if bitorder == "little":
+        if bitorder == 'little':
             bits.reverse()
         value = 0
         for i in range(len(bits)):
@@ -66,16 +66,16 @@ class DataReader:
         if signed and value < 0:
             value += value_max
         if value < 0 or value >= value_max:
-            raise RuntimeError("value is out of bounds")
+            raise RuntimeError('value is out of bounds')
         return value
 
-    def int_from_bytes(self, byte_qty, byteorder="little", signed=False):
+    def int_from_bytes(self, byte_qty, byteorder='little', signed=False):
         return int.from_bytes(self.bytes(byte_qty), byteorder=byteorder, signed=signed)
 
     def unsigned_expgolomb(self):
         bit_qty = 0
         bit_string = str(self.bit())
-        while bit_string[-1:] == "0":
+        while bit_string[-1:] == '0':
             bit_qty += 1
             bit_string += str(self.bit())
         for i in range(bit_qty):
@@ -144,29 +144,29 @@ class BitStreamWriter:
         for byte in data:
             self.byte(byte)
 
-    def int_to_bytes(self, value, length, byteorder="little"):
+    def int_to_bytes(self, value, length, byteorder='little'):
         self.bytes(list(value.to_bytes(length, byteorder)))
 
-    def int_to_bits(self, value, length, bitorder="little", signed=False):
+    def int_to_bits(self, value, length, bitorder='little', signed=False):
         value_max = 1 << length
         if signed and value < 0:
             value += value_max
         if value < 0 or value >= value_max:
-            raise RuntimeError("value is out of bounds")
+            raise RuntimeError('value is out of bounds')
         out = []
         for _ in range(length):
             out.append(value & 1)
             value = value // 2
-        if bitorder == "little":
+        if bitorder == 'little':
             out.reverse()
         self.bits(out)
 
     def unsigned_expgolomb(self, value):
         if value < 0:
-            raise RuntimeError("value is out of bounds")
+            raise RuntimeError('value is out of bounds')
         value += 1
         out = f"{value:b}"
-        out = "0" * (len(out) - 1) + out
+        out = '0' * (len(out) - 1) + out
         for b in out:
             self.bit(int(b))
 
@@ -178,7 +178,7 @@ class BitStreamWriter:
 
     def vlc2(self, value, vlc):
         if value < 0 or value >= len(vlc.bit_strings):
-            raise RuntimeError("value is out of bounds")
+            raise RuntimeError('value is out of bounds')
         bs = vlc.bit_strings[value]
         for b in bs:
             self.bit(int(b))

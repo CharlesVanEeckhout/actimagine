@@ -78,7 +78,7 @@ class ActImagine_ExportVXFolderIterator:
             if self.audio_streams_qty > 0:
                 # todo: clip audio to [-1, 1]
                 self.audio_samples *= 8
-                wavfile.write(os.path.join(self.folder_path, "fullaudio.wav"), self.audio_sample_rate, self.audio_samples)
+                wavfile.write(os.path.join(self.folder_path, 'fullaudio.wav'), self.audio_sample_rate, self.audio_samples)
             raise StopIteration
         avframe = self.avframes.pop(0)
         avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))
@@ -174,30 +174,30 @@ class ActImagine:
         self.seek_table_entries_qty = reader.int_from_bytes(4)
 
         if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
-            raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
+            raise RuntimeError('frame dimensions ' + str(self.frame_width) + 'x' + str(self.frame_height) + 'px are not multiple of 16x16px')
 
 
         self.audio_extradata = {}
         reader_temp = io.DataReader()
         reader_temp.set_data_bytes(data[self.audio_extradata_offset:])
 
-        self.audio_extradata["lpc_codebooks"] = []
+        self.audio_extradata['lpc_codebooks'] = []
         for i in range(3):
-            self.audio_extradata["lpc_codebooks"].append([])
+            self.audio_extradata['lpc_codebooks'].append([])
             for j in range(64):
-                self.audio_extradata["lpc_codebooks"][i].append([])
+                self.audio_extradata['lpc_codebooks'][i].append([])
                 for k in range(8):
-                    self.audio_extradata["lpc_codebooks"][i][j].append(reader_temp.int_from_bytes(2, signed=True))
+                    self.audio_extradata['lpc_codebooks'][i][j].append(reader_temp.int_from_bytes(2, signed=True))
 
-        self.audio_extradata["scale_modifiers"] = []
+        self.audio_extradata['scale_modifiers'] = []
         for i in range(8):
-            self.audio_extradata["scale_modifiers"].append(reader_temp.int_from_bytes(2))
+            self.audio_extradata['scale_modifiers'].append(reader_temp.int_from_bytes(2))
 
-        self.audio_extradata["lpc_base"] = []
+        self.audio_extradata['lpc_base'] = []
         for i in range(8):
-            self.audio_extradata["lpc_base"].append(reader_temp.int_from_bytes(4, signed=True))
+            self.audio_extradata['lpc_base'].append(reader_temp.int_from_bytes(4, signed=True))
 
-        self.audio_extradata["scale_initial"] = reader_temp.int_from_bytes(4)
+        self.audio_extradata['scale_initial'] = reader_temp.int_from_bytes(4)
 
 
         self.seek_table = []
@@ -205,8 +205,8 @@ class ActImagine:
         reader_temp.set_data_bytes(data[self.seek_table_offset:])
         for i in range(self.seek_table_entries_qty):
             self.seek_table.append({
-                "frame_id": reader_temp.int_from_bytes(4),
-                "frame_offset": reader_temp.int_from_bytes(4)
+                'frame_id': reader_temp.int_from_bytes(4),
+                'frame_offset': reader_temp.int_from_bytes(4)
             })
 
 
@@ -220,7 +220,7 @@ class ActImagine:
 
     def calculate_qtab(self):
         if self.quantizer < 12 or self.quantizer > 161:
-            raise RuntimeError("quantizer " + str(self.quantizer) + " was out of bounds")
+            raise RuntimeError('quantizer ' + str(self.quantizer) + ' was out of bounds')
         qx = self.quantizer % 6
         qy = self.quantizer // 6
         self.qtab = [i << qy for i in quant4x4_tab[qx]]
@@ -229,18 +229,18 @@ class ActImagine:
     def save_vx(self):
         data_audio_extradata = bytearray()
 
-        for codebook in self.audio_extradata["lpc_codebooks"]:
+        for codebook in self.audio_extradata['lpc_codebooks']:
             for lpc_filter_part in codebook:
                 for value in lpc_filter_part:
-                    data_audio_extradata += (value).to_bytes(2, byteorder="little", signed=True)
+                    data_audio_extradata += (value).to_bytes(2, byteorder='little', signed=True)
 
-        for scale_modifier in self.audio_extradata["scale_modifiers"]:
-            data_audio_extradata += (scale_modifier).to_bytes(2, byteorder="little")
+        for scale_modifier in self.audio_extradata['scale_modifiers']:
+            data_audio_extradata += (scale_modifier).to_bytes(2, byteorder='little')
 
-        for value in self.audio_extradata["lpc_base"]:
-            data_audio_extradata += (value).to_bytes(4, byteorder="little", signed=True)
+        for value in self.audio_extradata['lpc_base']:
+            data_audio_extradata += (value).to_bytes(4, byteorder='little', signed=True)
 
-        data_audio_extradata += (self.audio_extradata["scale_initial"]).to_bytes(4, byteorder="little")
+        data_audio_extradata += (self.audio_extradata['scale_initial']).to_bytes(4, byteorder='little')
 
         data_seek_table = bytearray()
         data_avframes = bytearray()
@@ -251,23 +251,23 @@ class ActImagine:
         for avframe in self.avframes:
             while self.seek_table_entries_qty < len(self.seek_table):
                 seek_table_entry = self.seek_table[self.seek_table_entries_qty]
-                if seek_table_entry["frame_id"] == self.frames_qty:
-                    seek_table_entry["frame_offset"] = 12*4 + len(data_avframes)
-                    data_seek_table += (seek_table_entry["frame_id"]).to_bytes(4, byteorder="little")
-                    data_seek_table += (seek_table_entry["frame_offset"]).to_bytes(4, byteorder="little")
+                if seek_table_entry['frame_id'] == self.frames_qty:
+                    seek_table_entry['frame_offset'] = 12*4 + len(data_avframes)
+                    data_seek_table += (seek_table_entry['frame_id']).to_bytes(4, byteorder='little')
+                    data_seek_table += (seek_table_entry['frame_offset']).to_bytes(4, byteorder='little')
                     self.seek_table_entries_qty += 1
                 else:
                     break
 
             frame_data_size = len(avframe.data) + 2
             self.frame_data_size_max = max(frame_data_size + 2, self.frame_data_size_max)
-            data_avframes += (frame_data_size).to_bytes(2, byteorder="little")
-            data_avframes += (len(avframe.aframes)).to_bytes(2, byteorder="little")
+            data_avframes += (frame_data_size).to_bytes(2, byteorder='little')
+            data_avframes += (len(avframe.aframes)).to_bytes(2, byteorder='little')
             data_avframes += avframe.data
             self.frames_qty += 1
 
         if self.seek_table_entries_qty < len(self.seek_table):
-            print("warning: some seek table entries were omitted from vx, because frame id was smaller than previous entry. is this normally possible?")
+            print('warning: some seek table entries were omitted from vx, because frame id was smaller than previous entry. is this normally possible?')
 
         self.audio_extradata_offset = 12*4 + len(data_avframes)
         self.seek_table_offset = 12*4 + len(data_avframes) + len(data_audio_extradata)
@@ -275,17 +275,17 @@ class ActImagine:
         data_header = bytearray()
 
         data_header += self.file_signature
-        data_header += (self.frames_qty).to_bytes(4, byteorder="little")
-        data_header += (self.frame_width).to_bytes(4, byteorder="little")
-        data_header += (self.frame_height).to_bytes(4, byteorder="little")
-        data_header += (int(self.frame_rate * 0x10000)).to_bytes(4, byteorder="little")
-        data_header += (self.quantizer).to_bytes(4, byteorder="little")
-        data_header += (self.audio_sample_rate).to_bytes(4, byteorder="little")
-        data_header += (self.audio_streams_qty).to_bytes(4, byteorder="little")
-        data_header += (self.frame_data_size_max).to_bytes(4, byteorder="little")
-        data_header += (self.audio_extradata_offset).to_bytes(4, byteorder="little")
-        data_header += (self.seek_table_offset).to_bytes(4, byteorder="little")
-        data_header += (self.seek_table_entries_qty).to_bytes(4, byteorder="little")
+        data_header += (self.frames_qty).to_bytes(4, byteorder='little')
+        data_header += (self.frame_width).to_bytes(4, byteorder='little')
+        data_header += (self.frame_height).to_bytes(4, byteorder='little')
+        data_header += (int(self.frame_rate * 0x10000)).to_bytes(4, byteorder='little')
+        data_header += (self.quantizer).to_bytes(4, byteorder='little')
+        data_header += (self.audio_sample_rate).to_bytes(4, byteorder='little')
+        data_header += (self.audio_streams_qty).to_bytes(4, byteorder='little')
+        data_header += (self.frame_data_size_max).to_bytes(4, byteorder='little')
+        data_header += (self.audio_extradata_offset).to_bytes(4, byteorder='little')
+        data_header += (self.seek_table_offset).to_bytes(4, byteorder='little')
+        data_header += (self.seek_table_entries_qty).to_bytes(4, byteorder='little')
 
 
         data = data_header + data_avframes + data_audio_extradata + data_seek_table
@@ -295,25 +295,25 @@ class ActImagine:
 
     def get_properties(self):
         properties = {
-            "file_signature": list(self.file_signature),
-            "frame_rate": self.frame_rate,
-            "quantizer": self.quantizer,
-            "audio_sample_rate": self.audio_sample_rate,
-            "audio_streams_qty": self.audio_streams_qty,
-            "audio_extradata": self.audio_extradata,
-            "seek_table": self.seek_table,
+            'file_signature': list(self.file_signature),
+            'frame_rate': self.frame_rate,
+            'quantizer': self.quantizer,
+            'audio_sample_rate': self.audio_sample_rate,
+            'audio_streams_qty': self.audio_streams_qty,
+            'audio_extradata': self.audio_extradata,
+            'seek_table': self.seek_table,
         }
         return properties
 
 
     def set_properties(self, properties):
-        self.file_signature = bytearray(properties["file_signature"])
-        self.frame_rate = properties["frame_rate"]
-        self.quantizer = properties["quantizer"]
-        self.audio_sample_rate = properties["audio_sample_rate"]
-        self.audio_streams_qty = properties["audio_streams_qty"]
-        self.audio_extradata = properties["audio_extradata"]
-        self.seek_table = properties["seek_table"]
+        self.file_signature = bytearray(properties['file_signature'])
+        self.frame_rate = properties['frame_rate']
+        self.quantizer = properties['quantizer']
+        self.audio_sample_rate = properties['audio_sample_rate']
+        self.audio_streams_qty = properties['audio_streams_qty']
+        self.audio_extradata = properties['audio_extradata']
+        self.seek_table = properties['seek_table']
         self.calculate_qtab()
 
 
@@ -323,27 +323,27 @@ class ActImagine:
         properties = self.get_properties()
         print(properties)
         properties_jsonstr = json.dumps(properties)
-        with open(os.path.join(folder_path, "properties.json"), "w") as f:
+        with open(os.path.join(folder_path, 'properties.json'), 'w') as f:
             f.write(properties_jsonstr)
         return ActImagine_ExportVXFolderIterator(self.avframes, self.audio_sample_rate, self.audio_streams_qty, folder_path)
 
 
     def import_vxfolder(self, folder_path):
-        with open(os.path.join(folder_path, "properties.json"), "r") as f:
+        with open(os.path.join(folder_path, 'properties.json'), 'r') as f:
             properties_jsonstr = f.read()
         properties = json.loads(properties_jsonstr)
         self.set_properties(properties)
         wav_data = []
         if self.audio_streams_qty > 0:
-            samplerate, wav_data = wavfile.read(os.path.join(folder_path, "fullaudio.wav"))
+            samplerate, wav_data = wavfile.read(os.path.join(folder_path, 'fullaudio.wav'))
             if samplerate != self.audio_sample_rate:
-                raise RuntimeError("properties sample rate does not match wav sample rate")
+                raise RuntimeError('properties sample rate does not match wav sample rate')
             if len(wav_data.shape) > 1:
                 if wav_data.shape[1] > 2:
-                    raise RuntimeError("can only support mono or stereo, not more channels")
-                raise NotImplementedError("stereo not implemented")
+                    raise RuntimeError('can only support mono or stereo, not more channels')
+                raise NotImplementedError('stereo not implemented')
             if wav_data.dtype != np.int16:
-                raise RuntimeError("can only support int16 samples")
+                raise RuntimeError('can only support int16 samples')
             wav_data_pad_shape = list(wav_data.shape)
             wav_data_pad_shape[0] = (-wav_data.shape[0]) & 0x7f
             wav_data = np.append(wav_data, np.zeros(wav_data_pad_shape, dtype=wav_data.dtype))
@@ -358,7 +358,7 @@ class ActImagine:
         image = Image.open(filename)
         self.frame_width, self.frame_height = image.size
         if (self.frame_width % 16) != 0 or (self.frame_height % 16) != 0:
-            raise RuntimeError("frame dimensions " + str(self.frame_width) + "x" + str(self.frame_height) + "px are not multiple of 16x16px")
+            raise RuntimeError('frame dimensions ' + str(self.frame_width) + 'x' + str(self.frame_height) + 'px are not multiple of 16x16px')
 
         return ActImagine_ImportVXFolderIterator(self, folder_path, wav_data)
 

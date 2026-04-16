@@ -9,18 +9,18 @@ class SimplePulseExtend:
 
 
     def init_audio_extradata(self, audio_extradata):
-        audio_extradata["lpc_codebooks"] = []
+        audio_extradata['lpc_codebooks'] = []
         for i in range(3):
-            audio_extradata["lpc_codebooks"].append([])
+            audio_extradata['lpc_codebooks'].append([])
             for j in range(64):
-                audio_extradata["lpc_codebooks"][i].append([0, 0, 0, 0, 0, 0, 0, 0])
+                audio_extradata['lpc_codebooks'][i].append([0, 0, 0, 0, 0, 0, 0, 0])
 
-        audio_extradata["scale_modifiers"] = [int(0x2000*(2**(-i))) for i in range(8)]
-        print(audio_extradata["scale_modifiers"])
+        audio_extradata['scale_modifiers'] = [int(0x2000*(2**(-i))) for i in range(8)]
+        print(audio_extradata['scale_modifiers'])
 
-        audio_extradata["lpc_base"] = [-22420, 12486, 4995, -10789, 10079, -2117, -3497, 1811]
+        audio_extradata['lpc_base'] = [-22420, 12486, 4995, -10789, 10079, -2117, -3497, 1811]
 
-        audio_extradata["scale_initial"] = 0x10000000//0x2000//3 # 0x10000000 is max
+        audio_extradata['scale_initial'] = 0x10000000//0x2000//3 # 0x10000000 is max
 
 
     def encode(self, aframe_encoder):
@@ -51,7 +51,7 @@ class SimplePulseExtend:
         if aframe_data_handler.scale_modifier_index is None:
             aframe_data_handler.prev_frame_offset = 0x7e # zeroes
             aframe_data_handler.scale_modifier_index = 7
-        print(audio_extradata["scale_modifiers"][aframe_data_handler.scale_modifier_index])
+        print(audio_extradata['scale_modifiers'][aframe_data_handler.scale_modifier_index])
 
         aframe_data_handler.pack_to_writer(aframe_encoder.writer)
 

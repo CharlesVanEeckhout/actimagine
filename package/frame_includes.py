@@ -53,45 +53,45 @@ def av_clip_pixel(x):
 
 def block_half_left(block):
     return {
-        "x": block["x"],
-        "y": block["y"],
-        "w": block["w"]//2,
-        "h": block["h"]
+        'x': block['x'],
+        'y': block['y'],
+        'w': block['w']//2,
+        'h': block['h']
     }
 
 def block_half_right(block):
     return {
-        "x": block["x"] + block["w"]//2,
-        "y": block["y"],
-        "w": block["w"]//2,
-        "h": block["h"]
+        'x': block['x'] + block['w']//2,
+        'y': block['y'],
+        'w': block['w']//2,
+        'h': block['h']
     }
 
 def block_half_up(block):
     return {
-        "x": block["x"],
-        "y": block["y"],
-        "w": block["w"],
-        "h": block["h"]//2
+        'x': block['x'],
+        'y': block['y'],
+        'w': block['w'],
+        'h': block['h']//2
     }
 
 def block_half_down(block):
     return {
-        "x": block["x"],
-        "y": block["y"] + block["h"]//2,
-        "w": block["w"],
-        "h": block["h"]//2
+        'x': block['x'],
+        'y': block['y'] + block['h']//2,
+        'w': block['w'],
+        'h': block['h']//2
     }
 
 
 def get_step(plane):
-    return 1 if plane == "y" else 2
+    return 1 if plane == 'y' else 2
 
 def plane_buffer_iterator(block, planes, callback):
     for plane in planes:
         step = get_step(plane)
-        for y in range(block["y"], block["y"] + block["h"], step):
-            for x in range(block["x"], block["x"] + block["w"], step):
+        for y in range(block['y'], block['y'] + block['h'], step):
+            for x in range(block['x'], block['x'] + block['w'], step):
                 callback(x, y, plane)
 
 

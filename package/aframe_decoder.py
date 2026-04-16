@@ -26,8 +26,8 @@ class AFrameDecoder:
         if self.aframe.prev_aframe is not None:
             self.aframe.scale = self.aframe.prev_aframe.scale
         else:
-            self.aframe.scale = self.aframe.audio_extradata["scale_initial"] * 0x2000
-        self.aframe.scale *= self.aframe.audio_extradata["scale_modifiers"][self.data_handler.scale_modifier_index] / 0x2000
+            self.aframe.scale = self.aframe.audio_extradata['scale_initial'] * 0x2000
+        self.aframe.scale *= self.aframe.audio_extradata['scale_modifiers'][self.data_handler.scale_modifier_index] / 0x2000
 
         if self.aframe.scale > 0x0FFFFFFF: # debug failsafe to be removed
             self.aframe.scale /= 0x10
@@ -50,18 +50,18 @@ class AFrameDecoder:
 
         if self.data_handler.prev_frame_offset == 0x7f:
             # intra frame
-            self.aframe.lpc_filter = self.aframe.audio_extradata["lpc_base"].copy()
+            self.aframe.lpc_filter = self.aframe.audio_extradata['lpc_base'].copy()
         else:
             # inter frame
             if self.aframe.prev_aframe is None:
-                raise RuntimeError("inter aframe has no previous aframe")
+                raise RuntimeError('inter aframe has no previous aframe')
             self.aframe.lpc_filter = self.aframe.prev_aframe.lpc_filter.copy()
 
         lpc_filter_difference = []
         for k in range(8):
             coeff_sum = 0
             for i in range(3):
-                coeff_sum += self.aframe.audio_extradata["lpc_codebooks"][i][self.data_handler.lpc_codebook_indexes[i]][k]
+                coeff_sum += self.aframe.audio_extradata['lpc_codebooks'][i][self.data_handler.lpc_codebook_indexes[i]][k]
             lpc_filter_difference.append(coeff_sum)
         logger.debug(lpc_filter_difference)
         logger.debug(self.data_handler.pulse_start_position)
