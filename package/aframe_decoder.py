@@ -23,11 +23,26 @@ class AFrameDecoder:
         self.data_handler = AFrameDataHandler()
         self.data_handler.unpack_from_reader(self.reader)
 
+        self.aframe.scale = self.aframe.audio_extradata['scale_initial'] * 0x2000
         if self.aframe.prev_aframe is not None:
-            self.aframe.scale = self.aframe.prev_aframe.scale
+            if self.aframe.prev_aframe.prev_aframe is not None:
+                prev_samples = self.aframe.prev_aframe.prev_aframe.samples
+            else:
+                prev_samples = [0]*128
+            prev_samples += self.aframe.prev_aframe.samples
+            if self.data_handler.prev_frame_offset != 0x7F:
+                self.aframe.scale = self.aframe.prev_aframe.scale                
         else:
-            self.aframe.scale = self.aframe.audio_extradata['scale_initial'] * 0x2000
+            prev_samples = [0]*128*2
+        
         self.aframe.scale *= self.aframe.audio_extradata['scale_modifiers'][self.data_handler.scale_modifier_index] / 0x2000
+
+        def read_sample(i):
+            assert i >= -len(prev_samples) and i < 128
+            if i < 0:
+                return prev_samples[len(prev_samples) + i]
+            else:
+                return self.samples[i]
 
         if self.aframe.scale > 0x0FFFFFFF: # debug failsafe to be removed
             self.aframe.scale /= 0x10
@@ -48,7 +63,7 @@ class AFrameDecoder:
                 self.aframe.pulses[i-(0x7E-self.data_handler.prev_frame_offset)] += self.aframe.prev_aframe.pulses[i]
 
 
-        if self.data_handler.prev_frame_offset == 0x7f:
+        if self.data_handler.prev_frame_offset == 0x7F:
             # intra frame
             self.aframe.lpc_filter = self.aframe.audio_extradata['lpc_base'].copy()
         else:
@@ -68,7 +83,7 @@ class AFrameDecoder:
         logger.debug(self.data_handler.prev_frame_offset)
 
         self.lpc_filter_quarters = [[], [], [], []]
-        if self.data_handler.prev_frame_offset != 0x7f:
+        if self.data_handler.prev_frame_offset != 0x7F:
             # inter frame
             for i in range(len(self.aframe.lpc_filter)):
                 self.lpc_filter_quarters[0].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 1 // 4)
@@ -86,12 +101,14 @@ class AFrameDecoder:
                 self.aframe.lpc_filter[i] += lpc_filter_difference[i]
 
 
-        prev_samples = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.samples = []
         if self.data_handler.prev_frame_offset < 0x7E:
-            prev_samples = []
-            for i in range(120, 128):
-                prev_samples.append(self.aframe.prev_aframe.samples[i])
+            self.samples = []
+            for i in range(0, 128):
+                volume = min(8, i+1, 128-i)
+                self.samples.append(read_sample(i - 128 - 1 - self.data_handler.prev_frame_offset) * volume // 16)
+        else:
+            self.samples = [0]*128
+        
         for i in range(0, 128):
             lpc_filter_quarter = self.lpc_filter_quarters[i * 4 // 128]
             index = (i - self.data_handler.pulse_start_position) / distance
@@ -101,12 +118,8 @@ class AFrameDecoder:
                 coeff = lpc_filter_quarter[j] / 0x8000
                 prev_sample_influence = [prev_sample_influence[k] + prev_sample_influence[len(prev_sample_influence)-1-k]*coeff for k in range(len(prev_sample_influence))] + [0]
             for j in range(len(lpc_filter_quarter)):
-                prev_sample_index = i - 1 - j
-                if prev_sample_index < 0:
-                    prev_sample = prev_samples[8 + prev_sample_index]
-                else:
-                    prev_sample = self.samples[prev_sample_index]
+                prev_sample = read_sample(i - 1 - j)
                 sample -= prev_sample * prev_sample_influence[j+1]
-            self.samples.append(math.floor(sample))
+            self.samples[i] += math.floor(sample)
         self.aframe.samples = self.samples
 
