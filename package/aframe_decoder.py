@@ -23,7 +23,7 @@ class AFrameDecoder:
         self.data_handler = AFrameDataHandler()
         self.data_handler.unpack_from_reader(self.reader)
 
-        self.aframe.scale = self.aframe.audio_extradata['scale_initial'] * 0x2000
+        self.aframe.scale = self.aframe.audio_extradata['scale_initial']
         if self.aframe.prev_aframe is not None:
             if self.aframe.prev_aframe.prev_aframe is not None:
                 prev_samples = self.aframe.prev_aframe.prev_aframe.samples
@@ -31,11 +31,12 @@ class AFrameDecoder:
                 prev_samples = [0]*128
             prev_samples += self.aframe.prev_aframe.samples
             if self.data_handler.prev_frame_offset != 0x7F:
-                self.aframe.scale = self.aframe.prev_aframe.scale                
+                self.aframe.scale = self.aframe.prev_aframe.scale
         else:
             prev_samples = [0]*128*2
-        
-        self.aframe.scale *= self.aframe.audio_extradata['scale_modifiers'][self.data_handler.scale_modifier_index] / 0x2000
+
+        self.aframe.scale = (self.aframe.scale * self.aframe.audio_extradata['scale_modifiers'][self.data_handler.scale_modifier_index]) // 0x2000
+        print(self.aframe.scale)
 
         def read_sample(i):
             assert i >= -len(prev_samples) and i < 128
@@ -45,14 +46,14 @@ class AFrameDecoder:
                 return self.samples[i]
 
         if self.aframe.scale > 0x0FFFFFFF: # debug failsafe to be removed
-            self.aframe.scale /= 0x10
+            self.aframe.scale //= 0x10
 
 
         distance = self.data_handler.get_pulse_distance()
         self.pulse_values = [val * self.aframe.scale for val in self.data_handler.pulse_values]
 
         self.aframe.pulses = []
-        for i in range(0, 128):
+        for i in range(128):
             index = (i - self.data_handler.pulse_start_position) / distance
             pulse = 0
             if index >= 0 and index < len(self.pulse_values) and (index % 1) == 0:
@@ -81,45 +82,62 @@ class AFrameDecoder:
         logger.debug(lpc_filter_difference)
         logger.debug(self.data_handler.pulse_start_position)
         logger.debug(self.data_handler.prev_frame_offset)
+        
+        for i in range(len(self.aframe.lpc_filter)):
+            self.aframe.lpc_filter[i] += lpc_filter_difference[i]
+        
+        self.aframe.prev_sample_influence = []
+        for i in range(8):
+            coeff = self.aframe.lpc_filter[i]
+            self.aframe.prev_sample_influence = [
+                self.aframe.prev_sample_influence[j] + ((self.aframe.prev_sample_influence[i-j-1] * coeff) // 0x8000)
+                for j in range(i)
+            ]
+            self.aframe.prev_sample_influence.append(coeff)
+        self.aframe.prev_sample_influence = [-(p // 2) for p in self.aframe.prev_sample_influence]
 
-        self.lpc_filter_quarters = [[], [], [], []]
+        self.prev_sample_influence_quarters = [[], [], [], []]
         if self.data_handler.prev_frame_offset != 0x7F:
             # inter frame
             for i in range(len(self.aframe.lpc_filter)):
-                self.lpc_filter_quarters[0].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 1 // 4)
-                self.lpc_filter_quarters[1].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 2 // 4)
-                self.lpc_filter_quarters[2].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 3 // 4)
-                self.lpc_filter_quarters[3].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i] * 4 // 4)
-                self.aframe.lpc_filter[i] += lpc_filter_difference[i]
+                self.prev_sample_influence_quarters[3] = self.aframe.prev_sample_influence[:]
+                self.prev_sample_influence_quarters[1] = [
+                    (self.aframe.prev_aframe.prev_sample_influence[j] + self.prev_sample_influence_quarters[3][j]) // 2
+                    for j in range(len(self.aframe.prev_sample_influence))
+                ]
+                self.prev_sample_influence_quarters[0] = [
+                    (self.aframe.prev_aframe.prev_sample_influence[j] + self.prev_sample_influence_quarters[1][j]) // 2
+                    for j in range(len(self.aframe.prev_sample_influence))
+                ]
+                self.prev_sample_influence_quarters[2] = [
+                    (self.prev_sample_influence_quarters[1][j] + self.prev_sample_influence_quarters[3][j]) // 2
+                    for j in range(len(self.aframe.prev_sample_influence))
+                ]
         else:
             # intra frame
             for i in range(len(self.aframe.lpc_filter)):
-                self.lpc_filter_quarters[0].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
-                self.lpc_filter_quarters[1].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
-                self.lpc_filter_quarters[2].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
-                self.lpc_filter_quarters[3].append(self.aframe.lpc_filter[i] + lpc_filter_difference[i])
-                self.aframe.lpc_filter[i] += lpc_filter_difference[i]
+                self.prev_sample_influence_quarters[0] = self.aframe.prev_sample_influence[:]
+                self.prev_sample_influence_quarters[1] = self.prev_sample_influence_quarters[0]
+                self.prev_sample_influence_quarters[2] = self.prev_sample_influence_quarters[0]
+                self.prev_sample_influence_quarters[3] = self.prev_sample_influence_quarters[0]
 
 
         if self.data_handler.prev_frame_offset < 0x7E:
             self.samples = []
-            for i in range(0, 128):
+            for i in range(128):
                 volume = min(8, i+1, 128-i)
                 self.samples.append(read_sample(i - 128 - 1 - self.data_handler.prev_frame_offset) * volume // 16)
         else:
             self.samples = [0]*128
-        
-        for i in range(0, 128):
-            lpc_filter_quarter = self.lpc_filter_quarters[i * 4 // 128]
-            index = (i - self.data_handler.pulse_start_position) / distance
-            sample = self.aframe.pulses[i]
-            prev_sample_influence = [1.0, 0.0]
-            for j in range(len(lpc_filter_quarter)):
-                coeff = lpc_filter_quarter[j] / 0x8000
-                prev_sample_influence = [prev_sample_influence[k] + prev_sample_influence[len(prev_sample_influence)-1-k]*coeff for k in range(len(prev_sample_influence))] + [0]
-            for j in range(len(lpc_filter_quarter)):
+
+        for i in range(128):
+            prev_sample_influence = self.prev_sample_influence_quarters[i * 4 // 128]
+            sample = self.aframe.pulses[i] * 0x4000
+            for j in range(len(prev_sample_influence)):
                 prev_sample = read_sample(i - 1 - j)
-                sample -= prev_sample * prev_sample_influence[j+1]
-            self.samples[i] += math.floor(sample)
+                sample += prev_sample * prev_sample_influence[j]
+            sample //= 0x4000
+            self.samples[i] += sample
+        #print([f"{s&0xffffffff:08x}" for s in self.samples])
         self.aframe.samples = self.samples
 
