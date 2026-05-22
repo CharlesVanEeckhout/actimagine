@@ -35,17 +35,20 @@ def convert_yuv_to_smpte170m(yuv):
 
 
 def convert_frame_to_image(frame):
-    image = Image.new('RGB', (frame['y'].shape[1], frame['y'].shape[0]))
-
-    for y in range(frame['y'].shape[0]):
-        for x in range(frame['y'].shape[1]):
-            image.putpixel((x, y), convert_yuv_to_rgb((
-                int(frame['y'][y][x]),
-                int(frame['u'][y//2][x//2]),
-                int(frame['v'][y//2][x//2])
-            )))
-
-    return image
+    a = np.zeros((frame['y'].shape[0], frame['y'].shape[1], 3), dtype=np.uint8)
+    y, u, v = frame['y'].astype(np.int16), frame['u'].astype(np.int16), frame['v'].astype(np.int16)
+    u -= 128
+    v -= 128
+    # stretch to correct shape
+    u = np.repeat(np.repeat(u,2, axis=0), 2, axis=1)
+    v = np.repeat(np.repeat(v,2, axis=0), 2, axis=1)
+    # Red
+    a[:,:,0] += np.clip(y + 2*v, 0, 255).astype(np.uint8)
+    # Green
+    a[:,:,1] += np.clip(y - u//2 - v, 0, 255).astype(np.uint8)
+    # Blue
+    a[:,:,2] += np.clip(y+2*u, 0, 255).astype(np.uint8)
+    return Image.fromarray(a)
 
 
 def convert_image_to_frame(image):
