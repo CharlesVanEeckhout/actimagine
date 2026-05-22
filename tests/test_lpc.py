@@ -8,7 +8,7 @@ from lpc_test_context import lpc_test_context
 
 
 @pytest.mark.parametrize(
-    "key", lpc_test_context.keys()
+    'key', lpc_test_context.keys()
 )
 def test_lpc(key):
     expected_list = lpc_test_expected[key]

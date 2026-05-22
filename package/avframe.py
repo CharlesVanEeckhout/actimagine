@@ -34,7 +34,7 @@ class AVFrame:
     def decode(self):
         # read bits from little endian uint16 list from msb to lsb
         reader = io.DataReader()
-        reader.set_data_bytes([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])], bitorder="big")
+        reader.set_data_bytes([byte for i in range(0, len(self.data)-1, 2) for byte in reversed(self.data[i:i+2])], bitorder='big')
         self.vframe.decode(reader)
         for aframe in self.aframes:
             aframe.decode(reader)

@@ -7,7 +7,7 @@ from .common import *
 class VFrameEncoderStrategyAbstract:
     def __init__(self):
         if type(self) == VFrameEncoderStrategyAbstract:
-            raise TypeError("cannot instantiate abstract class " + str(type(self)))
+            raise TypeError('cannot instantiate abstract class ' + str(type(self)))
         self.vframe = None
         self.writer = None
         self.goal_plane_buffers = None
@@ -35,8 +35,8 @@ class VFrameEncoderStrategyAbstract:
         self.goal_plane_buffers = frame_encoder.goal_plane_buffers
 
         self.coeff_buffers = {
-            "y": np.zeros((self.vframe.height // 4 + 1, self.vframe.width // 4 + 1), dtype=np.uint8),
-            "uv": np.zeros((self.vframe.height // 8 + 1, self.vframe.width // 8 + 1), dtype=np.uint8)
+            'y': np.zeros((self.vframe.height // 4 + 1, self.vframe.width // 4 + 1), dtype=np.uint8),
+            'uv': np.zeros((self.vframe.height // 8 + 1, self.vframe.width // 8 + 1), dtype=np.uint8)
         }
 
         self.dct_filters = get_dct_filters(self.vframe.qtab)
@@ -44,10 +44,10 @@ class VFrameEncoderStrategyAbstract:
         for y in range(0, self.vframe.height, 16):
             for x in range(0, self.vframe.width, 16):
                 block = {
-                    "x": x,
-                    "y": y,
-                    "w": 16,
-                    "h": 16
+                    'x': x,
+                    'y': y,
+                    'w': 16,
+                    'h': 16
                 }
 
                 self.encode_mb(block)

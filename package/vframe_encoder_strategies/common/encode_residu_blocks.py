@@ -10,116 +10,116 @@ logger.propagate = True # enable/disable
 
 def encode_residu_blocks_check(self, block):
     check_result = {
-        "check_results": [],
-        "is_worth_encoding": False
+        'check_results': [],
+        'is_worth_encoding': False
     }
-    for y in range(0, block["h"], 8):
-        for x in range(0, block["w"], 8):
-            cr = encode_residu_block_check(self, block["x"]+x, block["y"]+y)
-            check_result["check_results"].append(cr)
-            check_result["is_worth_encoding"] = (check_result["is_worth_encoding"] or cr["is_worth_encoding"])
+    for y in range(0, block['h'], 8):
+        for x in range(0, block['w'], 8):
+            cr = encode_residu_block_check(self, block['x']+x, block['y']+y)
+            check_result['check_results'].append(cr)
+            check_result['is_worth_encoding'] = (check_result['is_worth_encoding'] or cr['is_worth_encoding'])
 
     return check_result
 
 def encode_residu_blocks_write(self, check_result):
-    for cr in check_result["check_results"]:
+    for cr in check_result['check_results']:
         encode_residu_block_write(self, cr)
 
 
 def encode_residu_block_check(self, x, y):
     check_result = {
-        "x": x,
-        "y": y
+        'x': x,
+        'y': y
     }
 
     # calculate the levels
-    check_result["level_y00"] = encode_dct(self, x  , y  , "y")
-    check_result["level_y01"] = encode_dct(self, x+4, y  , "y")
-    check_result["level_y10"] = encode_dct(self, x  , y+4, "y")
-    check_result["level_y11"] = encode_dct(self, x+4, y+4, "y")
-    check_result["level_u"] = encode_dct(self, x, y, "u")
-    check_result["level_v"] = encode_dct(self, x, y, "v")
+    check_result['level_y00'] = encode_dct(self, x  , y  , 'y')
+    check_result['level_y01'] = encode_dct(self, x+4, y  , 'y')
+    check_result['level_y10'] = encode_dct(self, x  , y+4, 'y')
+    check_result['level_y11'] = encode_dct(self, x+4, y+4, 'y')
+    check_result['level_u'] = encode_dct(self, x, y, 'u')
+    check_result['level_v'] = encode_dct(self, x, y, 'v')
 
-    check_result["residu_mask"] = \
-        any(check_result["level_y00"]) * 1 + \
-        any(check_result["level_y01"]) * 2 + \
-        any(check_result["level_y10"]) * 4 + \
-        any(check_result["level_y11"]) * 8 + \
-        any(check_result["level_u"] + check_result["level_v"]) * 16
+    check_result['residu_mask'] = \
+        any(check_result['level_y00']) * 1 + \
+        any(check_result['level_y01']) * 2 + \
+        any(check_result['level_y10']) * 4 + \
+        any(check_result['level_y11']) * 8 + \
+        any(check_result['level_u'] + check_result['level_v']) * 16
 
-    check_result["is_worth_encoding"] = (check_result["residu_mask"] != 0)
+    check_result['is_worth_encoding'] = (check_result['residu_mask'] != 0)
 
     return check_result
 
 def encode_residu_block_write(self, check_result):
-    x = check_result["x"]
-    y = check_result["y"]
-    level_y00 = check_result["level_y00"]
-    level_y01 = check_result["level_y01"]
-    level_y10 = check_result["level_y10"]
-    level_y11 = check_result["level_y11"]
-    level_u = check_result["level_u"]
-    level_v = check_result["level_v"]
+    x = check_result['x']
+    y = check_result['y']
+    level_y00 = check_result['level_y00']
+    level_y01 = check_result['level_y01']
+    level_y10 = check_result['level_y10']
+    level_y11 = check_result['level_y11']
+    level_u = check_result['level_u']
+    level_v = check_result['level_v']
 
     # apply levels to actual_plane_buffers
-    VFrameDecoder.decode_dct(self, x  , y  , "y", level_y00)
-    VFrameDecoder.decode_dct(self, x+4, y  , "y", level_y01)
-    VFrameDecoder.decode_dct(self, x  , y+4, "y", level_y10)
-    VFrameDecoder.decode_dct(self, x+4, y+4, "y", level_y11)
-    VFrameDecoder.decode_dct(self, x, y, "u", level_u)
-    VFrameDecoder.decode_dct(self, x, y, "v", level_v)
+    VFrameDecoder.decode_dct(self, x  , y  , 'y', level_y00)
+    VFrameDecoder.decode_dct(self, x+4, y  , 'y', level_y01)
+    VFrameDecoder.decode_dct(self, x  , y+4, 'y', level_y10)
+    VFrameDecoder.decode_dct(self, x+4, y+4, 'y', level_y11)
+    VFrameDecoder.decode_dct(self, x, y, 'u', level_u)
+    VFrameDecoder.decode_dct(self, x, y, 'v', level_v)
 
     # encode residu
-    residu_mask = check_result["residu_mask"]
+    residu_mask = check_result['residu_mask']
     residu_mask_tab_index = ff_actimagine_vx_residu_mask_new_tab.index(residu_mask)
     self.writer.unsigned_expgolomb(residu_mask_tab_index)
 
     if residu_mask & 1 != 0:
-        coeff_left = self.coeff_buffer_getter("y", x  -1, y    )
-        coeff_top  = self.coeff_buffer_getter("y", x    , y  -1)
+        coeff_left = self.coeff_buffer_getter('y', x  -1, y    )
+        coeff_top  = self.coeff_buffer_getter('y', x    , y  -1)
         nc = int((coeff_left + coeff_top + 1) // 2)
-        out_total_coeff = encode_residu_cavlc(self, x  , y  , level_y00, nc, "y")
-        self.coeff_buffer_setter("y", x  , y  , out_total_coeff)
+        out_total_coeff = encode_residu_cavlc(self, x  , y  , level_y00, nc, 'y')
+        self.coeff_buffer_setter('y', x  , y  , out_total_coeff)
     else:
-        self.coeff_buffer_setter("y", x  , y  , 0)
+        self.coeff_buffer_setter('y', x  , y  , 0)
 
     if residu_mask & 2 != 0:
-        coeff_left = self.coeff_buffer_getter("y", x+4-1, y    )
-        coeff_top  = self.coeff_buffer_getter("y", x+4  , y  -1)
+        coeff_left = self.coeff_buffer_getter('y', x+4-1, y    )
+        coeff_top  = self.coeff_buffer_getter('y', x+4  , y  -1)
         nc = int((coeff_left + coeff_top + 1) // 2)
-        out_total_coeff = encode_residu_cavlc(self, x+4, y  , level_y01, nc, "y")
-        self.coeff_buffer_setter("y", x+4, y  , out_total_coeff)
+        out_total_coeff = encode_residu_cavlc(self, x+4, y  , level_y01, nc, 'y')
+        self.coeff_buffer_setter('y', x+4, y  , out_total_coeff)
     else:
-        self.coeff_buffer_setter("y", x+4, y  , 0)
+        self.coeff_buffer_setter('y', x+4, y  , 0)
 
     if residu_mask & 4 != 0:
-        coeff_left = self.coeff_buffer_getter("y", x  -1, y+4  )
-        coeff_top  = self.coeff_buffer_getter("y", x    , y+4-1)
+        coeff_left = self.coeff_buffer_getter('y', x  -1, y+4  )
+        coeff_top  = self.coeff_buffer_getter('y', x    , y+4-1)
         nc = int((coeff_left + coeff_top + 1) // 2)
-        out_total_coeff = encode_residu_cavlc(self, x  , y+4, level_y10, nc, "y")
-        self.coeff_buffer_setter("y", x  , y+4, out_total_coeff)
+        out_total_coeff = encode_residu_cavlc(self, x  , y+4, level_y10, nc, 'y')
+        self.coeff_buffer_setter('y', x  , y+4, out_total_coeff)
     else:
-        self.coeff_buffer_setter("y", x  , y+4, 0)
+        self.coeff_buffer_setter('y', x  , y+4, 0)
 
     if residu_mask & 8 != 0:
-        coeff_left = self.coeff_buffer_getter("y", x+4-1, y+4  )
-        coeff_top  = self.coeff_buffer_getter("y", x+4  , y+4-1)
+        coeff_left = self.coeff_buffer_getter('y', x+4-1, y+4  )
+        coeff_top  = self.coeff_buffer_getter('y', x+4  , y+4-1)
         nc = int((coeff_left + coeff_top + 1) // 2)
-        out_total_coeff = encode_residu_cavlc(self, x+4, y+4, level_y11, nc, "y")
-        self.coeff_buffer_setter("y", x+4, y+4, out_total_coeff)
+        out_total_coeff = encode_residu_cavlc(self, x+4, y+4, level_y11, nc, 'y')
+        self.coeff_buffer_setter('y', x+4, y+4, out_total_coeff)
     else:
-        self.coeff_buffer_setter("y", x+4, y+4, 0)
+        self.coeff_buffer_setter('y', x+4, y+4, 0)
 
     if residu_mask & 16 != 0:
-        coeff_left = self.coeff_buffer_getter("uv", x-1, y  )
-        coeff_top  = self.coeff_buffer_getter("uv", x  , y-1)
+        coeff_left = self.coeff_buffer_getter('uv', x-1, y  )
+        coeff_top  = self.coeff_buffer_getter('uv', x  , y-1)
         nc = int((coeff_left + coeff_top + 1) // 2)
-        out_total_coeff_u = encode_residu_cavlc(self, x, y, level_u, nc, "u")
-        out_total_coeff_v = encode_residu_cavlc(self, x, y, level_v, nc, "v")
+        out_total_coeff_u = encode_residu_cavlc(self, x, y, level_u, nc, 'u')
+        out_total_coeff_v = encode_residu_cavlc(self, x, y, level_v, nc, 'v')
         out_total_coeff = int((out_total_coeff_u + out_total_coeff_v + 1) // 2)
-        self.coeff_buffer_setter("uv", x, y, out_total_coeff)
+        self.coeff_buffer_setter('uv', x, y, out_total_coeff)
     else:
-        self.coeff_buffer_setter("uv", x, y, 0)
+        self.coeff_buffer_setter('uv', x, y, 0)
 
 
 def encode_dct(self, x, y, plane):
@@ -184,8 +184,8 @@ def encode_residu_cavlc(self, x, y, level, nc, plane):
             run_before_zeros.append(run_before_current_zero)
             run_before_current_zero = 0
 
-    logger.debug("run_before_zeros: " + str(run_before_zeros))
-    logger.debug("zeros_left: " + str(zeros_left))
+    logger.debug('run_before_zeros: ' + str(run_before_zeros))
+    logger.debug('zeros_left: ' + str(zeros_left))
     logger.debug(level)
 
     # trailing one coefficients
@@ -203,7 +203,7 @@ def encode_residu_cavlc(self, x, y, level, nc, plane):
             break
     trailing_ones = len(trailing_ones_signbits)
     coeff_token = (total_coeff << 2) + trailing_ones
-    logger.debug("trailing_ones: " + str(trailing_ones))
+    logger.debug('trailing_ones: ' + str(trailing_ones))
     logger.debug(level)
 
     # non trailing one coefficients
@@ -220,20 +220,20 @@ def encode_residu_cavlc(self, x, y, level, nc, plane):
         level_suffix = level[i] - (level_prefix << suffix_length)
         real_suffix_length = 11 if level_prefix == 15 else suffix_length
         if level_suffix >= (1 << real_suffix_length):
-            raise RuntimeError("level_suffix too large")
+            raise RuntimeError('level_suffix too large')
         level_prefixes.append(level_prefix)
         level_suffixes.append(level_suffix)
         real_suffix_lengths.append(real_suffix_length)
 
-        logger.debug("level_code " + str(level_code) + " vs suffix limit "+ str(ff_h264_cavlc_suffix_limit[suffix_length + 1]))
+        logger.debug('level_code ' + str(level_code) + ' vs suffix limit '+ str(ff_h264_cavlc_suffix_limit[suffix_length + 1]))
         suffix_length += 1 if abs(level_code) > ff_h264_cavlc_suffix_limit[suffix_length + 1] else 0
 
         level.pop(i)
 
-    logger.debug("level_code_signbits: " + str(level_code_signbits))
-    logger.debug("level_prefixes:      " + str(level_prefixes))
-    logger.debug("level_suffixes:      " + str(level_suffixes))
-    logger.debug("real_suffix_lengths: " + str(real_suffix_lengths))
+    logger.debug('level_code_signbits: ' + str(level_code_signbits))
+    logger.debug('level_prefixes:      ' + str(level_prefixes))
+    logger.debug('level_suffixes:      ' + str(level_suffixes))
+    logger.debug('real_suffix_lengths: ' + str(real_suffix_lengths))
 
     # encode level
 
@@ -267,8 +267,8 @@ def encode_residu_cavlc(self, x, y, level, nc, plane):
 
         run_before = run_before_zeros.pop(0)
 
-        logger.debug("zeros_left: " + str(zeros_left))
-        logger.debug("run_before: " + str(run_before))
+        logger.debug('zeros_left: ' + str(zeros_left))
+        logger.debug('run_before: ' + str(run_before))
         if zeros_left < 7:
             self.writer.vlc2(run_before, vlc.run_vlc[zeros_left])
         else:

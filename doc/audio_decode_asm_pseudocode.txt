@@ -1,0 +1,637 @@
+    .include "asm/constants.inc"
+    .include "asm/macros.inc"
+
+@ == CODE ==
+
+    .syntax unified
+
+
+
+    arm_func_start _start
+_start:
+    
+    
+    b LAB_02007746
+    
+end:
+    b end
+
+
+
+
+@ in r4
+thumb_func_start LAB_02007746
+LAB_02007746: @ 02007746
+r0 = DAT_02007928[0]
+r0 = (uint8)r0[#0x1b]
+r0 <<= #0x1f
+r0 >>>= #0x1f
+    cmp        r0,#0x0
+    beq        LAB_0200777e
+r0 = r4[#0x1c]
+sp[#local_24] = r0
+r0 = r4[#0x14]
+r0 >>>= #0x8
+sp[#local_1c] = r0
+        LAB_0200775c:
+r2 = r4[#0x20]
+r1 = r4[#0x24]
+r0 = sp[#local_24]
+r3 = r0 - r2
+r2 = sp[#local_20]
+r2 -c= r1
+r0 = sp[#local_1c]
+r5 = r0 - r3
+r6 = sp[#local_18]
+r6 -c= r2
+r2 = #0x0
+r1 = r6 + #0x0
+r1 ^= r2
+r0 = r5 + #0x0
+r0 ^= r2
+r1 |= r0
+            beq        LAB_0200775c
+    LAB_0200777e:
+r0 = r4[#0x8]
+r2 = r4[#0xc]
+r1 = r4[#0x18]
+r1 <<= #0x1
+r1 = r2 + r1
+    blx        FUN_020bd6a0
+r1 = r4[#0xc]
+r0 = r4[#0x18]
+r0 <<= #0x1
+r0 = r1 + r0
+r1 = DAT_0200792c[0]
+    blx        FUN_020a92a8
+r1 = r4[#0x18]
+r1 += #0x80
+r4[#0x18] = r1
+r0 = r4[#0x14]
+r0 >>>= #0x1
+    cmp        r1,r0
+    bne        LAB_020077ac
+r0 = sp[#local_14]
+r4[#0x18] = r0
+    LAB_020077ac:
+r0 = r4[#0x1c]
+r0 += #0x1
+r4[#0x1c] = r0
+r0 = sp[#local_30]
+r1 = r0 + #0x1
+sp[#local_30] = r1
+r0 = sp[#local_2c]
+    cmp        r1,r0
+    bcc        LAB_02007746
+
+    b end
+
+.align 2
+DAT_02007928:
+    .4byte DAT_027e029c
+DAT_0200792c:
+    .4byte 0x00000100
+
+
+DAT_027e029c:
+    @ idk
+
+
+
+arm_func_start FUN_020bd6a0
+FUN_020bd6a0: @ 020bd6a0
+    if r0 == 0:
+        return 0
+    return FUN_020bd9ec()
+
+
+@ in
+    @ r0: struct_022D0020
+    @ r1
+@ changed and not restored
+@ changed but restored
+    @ r4
+@ out
+    @ r0: boolean value, is there still aframes to decode?
+arm_func_start FUN_020bd9ec
+FUN_020bd9ec: @ 020bd9ec
+    stmdb      sp!,{r4,lr}
+    r4 = r0
+    if r4[#0x100] == r4[#0xfc]:
+        return 0
+    r2 = r4[#0xb4]
+    r3 = r4[#0x104]
+    r0 = r4[#0xb4] + (r4[#0x104] * sizeof(struct_0232EFE0))
+    r4[#0xb4][r4[#0x104] * sizeof(struct_0232EFE0)] = r4[#0x34] @ struct_0232EFE0.aframe_ptr
+    r4[#0xb4][r4[#0x104] * sizeof(struct_0232EFE0) + #0x4] = r1 @ struct_0232EFE0.channel_buffer_ptr
+    bl         FUN_01fffd28
+    r4[#0x34] += r0
+
+    r4[#0x104] += 1
+    if r4[#0x104] == r4[#0x20]:
+        r4[#0x104] = 0
+
+    r4[#0x100] += 1
+    return 1
+
+
+
+@ in
+    @ r0: struct_0232EFE0
+@ changed and not restored
+    @ r0
+    @ r2: DAT_01fffd9e
+@ changed but restored
+    @ r4,r5,r6,r7,r8,r9,r10,r11,r12,lr
+arm_func_start FUN_01fffd28
+FUN_01fffd28: @ 01fffd28
+    r1 = r0 @ struct_0232EFE0
+    r0 = r0[0] @ struct_0232EFE0.aframe_ptr
+    r5 = (uint16)r0[0] @ aframe_header_word1
+    r0 += 2
+    r6 = r5 >>> 9 @ prev_frame_offset
+    if r6 == 0x7f:
+        bl         process_inter_frame
+    else:
+        bl         process_intra_frame
+    struct_0232EFE0.aframe_buffer_id ^= 1
+    r2 = struct_0232EFE0.channel_buffer_ptr
+    for i in range(0x80)
+        r7 = r4[0]
+        r4 += sizeof(int32)
+        if r7 > 0x00007fff:
+            r7 = 0x00007fff
+        if r7 < 0xffff8000:
+            r7 = 0xffff8000
+        r2[0] = (int16)r7
+        r2 += sizeof(int16)
+    r0 = (uint8)DAT_01fffd9e[(uint8)struct_0232EFE0.pulse_packing_mode]
+    return
+
+
+DAT_01fffd98:
+    .byte 0x05, 0x0c @ pulse packing mode 1: 5 words, distance 3 * int32
+    .byte 0x04, 0x10 @ pulse packing mode 2: 4 words, distance 4 * int32
+    .byte 0x03, 0x14 @ pulse packing mode 3: 3 words, distance 5 * int32
+DAT_01fffd9e:
+    .byte 0x14
+    .byte 0x0e
+    .byte 0x0c
+    .byte 0x0a
+
+@ in
+    @ r1: struct_0232EFE0
+@ changed and not restored
+    @ r7: 0
+    @ r8: r1 + 0x98
+    @ r9: 0
+@ changed but restored
+arm_func_start process_inter_frame
+process_inter_frame: @ 01fffe1c
+    stmdb      sp!,{r1,lr}
+    
+    @ FUN_01fffcf8 inline:
+    struct_0232EFE0.scale = struct_0232EFE0.scale_???
+    struct_0232EFE0.aframe_buffer_id = 1
+    
+    r8 = struct_0232EFE0.prev_sample
+    for i in range(8)
+        r8[0] = 0
+        r8 += 4
+    
+    r3 = &struct_0232EFE0.aframe_buffer_1
+    bl         clear_aframe_buffer_bt @ aframe_buffer_0t
+    bl         unpack_pulses_from_aframe_header
+    r2 = &struct_0232EFE0.lpc_base
+    bl         get_prev_sample_influence
+    r2 = &struct_0232EFE0.prev_sample_influence_afrbuf1
+    stmia      r2,{r5,r6,r7,r8,r9,r10,r11,r12}
+    struct_0232EFE0.aframe_buffer_ptr = &struct_0232EFE0.aframe_buffer_0
+    r0 = struct_0232EFE0.aframe_buffer_0t
+    r2 = #0x80
+    bl         apply_prev_sample_influence
+    ldmia      sp!,{r1,pc}
+
+
+@ in
+    @ r1: struct_0232EFE0
+@ changed and not restored
+    @ r2
+    @ r3
+    @ r7
+    @ r8
+@ changed but restored
+arm_func_start process_intra_frame
+process_intra_frame: @ 01fffe5c
+    stmdb      sp!,{r1,lr}
+    r2 = struct_0232EFE0.aframe_buffer_id
+    r3 = (r2 * 0x400) + &struct_0232EFE0.aframe_buffer_0 @ aframe_buffer_a
+    r2 ^= 1
+    r4 = (r2 * 0x400) + &struct_0232EFE0.aframe_buffer_0 @ aframe_buffer_b
+    r8 = r3 @ aframe_buffer_a
+    r7 = r4 + 0x200 @ aframe_buffer_at
+
+    for i in range(0x80):
+        r8[i * sizeof(int32)] = r7[i * sizeof(int32)]
+    r7 += 0x80 * sizeof(int32)
+    r8 += 0x80 * sizeof(int32)
+    
+    if r6 == 0x7e:
+        bl         clear_aframe_buffer_bt
+    else:
+        bl         set_aframe_buffer_bt
+    
+    bl         unpack_pulses_from_aframe_header
+    r2 = &struct_0232EFE0.lpc_filter_cur
+    bl         get_prev_sample_influence
+    bl         apply_prev_sample_influence_inter_frame
+    ldmia      sp!,{r1,pc}
+
+
+
+@ in
+    @ r3: ptr to audio_buffer ??
+@ changed and not restored
+    @ r6: zero
+    @ r7: ptr to audio_buffer ??
+    @ r8-r11: zero
+@ changed but restored
+arm_func_start clear_aframe_buffer_bt
+clear_aframe_buffer_bt: @ 01fff560
+    r7 = r3 + 0x200
+    for i in range(0x200)
+        r7[i] = 0
+    r7 += 0x200
+    return
+
+
+@ in
+    @ r3: ptr to audio_buffer_a
+    @ r4
+    @ r6: previous frame offset
+@ changed and not restored
+    @ r2,r6,r7,r8,r9,r10,r11,r12: sample values
+@ changed but restored
+    @ r1
+    @ r3
+    @ r4
+arm_func_start set_aframe_buffer_bt
+set_aframe_buffer_bt: @ 01fff588
+    r3 += 0x200 @ aframe_buffer_bt
+    r4 += (0x7f - r6) * sizeof(int32) @ aframe_buffer_b + aframe_buffer_at
+
+    set_aframe_buffer_bt_write((r4[0] * 1) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 2) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 3) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 4) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 5) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 6) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 7) >> 4)
+
+    for i in range(0x72):
+        set_aframe_buffer_bt_write(r4[0] >> 1)
+
+    set_aframe_buffer_bt_write((r4[0] * 7) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 6) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 5) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 4) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 3) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 2) >> 4)
+    set_aframe_buffer_bt_write((r4[0] * 1) >> 4)
+    return
+
+def set_aframe_buffer_bt_write(val):
+    r3[0] = val
+    r4 += 4
+    r3 += 4
+
+
+@ in
+    @ r0: ptr to aframe + 2
+    @ r1: struct_0232EFE0
+    @ r3: aframe_buffer_a
+    @ r5: aframe_header_word1
+@ changed and not restored
+    @ r0,r5,r6,r7,r8,r9
+    @ r12: r1 + #0x72
+@ changed but restored
+    @ r1
+arm_func_start unpack_pulses_from_aframe_header
+unpack_pulses_from_aframe_header: @ 01fffda4
+    r6 = (r5 >>> 6) & 7 @ scale_modifier_index
+    struct_0232EFE0.lpc_codebook_indexes.0 = (uint8)(r5 & 0x3f)
+
+    r5 = (uint16)r0[0] @ aframe_header_word2
+    r0 += #0x2
+
+    r8 = (int16)struct_0232EFE0.scale_modifiers[r6 * sizeof(int16)]
+    r6 = (r8 * struct_0232EFE0.scale) >> 13
+    struct_0232EFE0.scale = r6
+
+    r7 = (r5 >>> 14) & 3 @ pulse_start_position
+    struct_0232EFE0.lpc_codebook_indexes.1 = (uint8)((r5 >>> 6) & 0x3f)
+    struct_0232EFE0.lpc_codebook_indexes.2 = (uint8)(r5 & 0x3f)
+
+    r11 = (r5 >>> 12) & 3 @ pulse_packing_mode
+    struct_0232EFE0.pulse_packing_mode = (uint8)r11
+    if r11 != 0:
+        r10 = DAT_01fffd98-2 + (r11 << #0x1)
+        r8 = (uint8)r10[#0x0]
+        r9 = (uint8)r10[#0x1]
+
+        @ LAB_01fff6d0:
+        r1 = r3 + #0x200 + (r7 << 2)
+        r7 = -r6 * 3
+        r6 <<= 1
+
+        for i in range(r8)
+            r5 = (uint16)r0[0]
+            r0 += 2
+
+            r11 = 16 - 2
+            for j in range(16 - 2, -1, -2):
+                r1[0] += (r6 * ((r5 >>> r11) & 3)) + r7
+                r1 += r9
+        
+        return
+    else:
+        @ LAB_01fff718:
+        r1 = r3 + #0x200 + (r7 << 2)
+        r7 = -r6 * 7
+        r6 <<= 1
+
+        r9 = 0
+        for i in range(8)
+            r5 = (uint16)r0[0]
+            r0 += 2
+
+            for j in range(16 - 3, -1, -3):
+                r1[0] += (r6 * ((r5 >>> r11) & 7)) + r7
+                r1 += #0xc
+            
+            r9 = (r9 << 1) | (r5 & 1)
+
+        r1[0] += (r6 * ((r9 >>> 5) & 7)) + r7
+        r1 += #0xc
+
+        r1[0] += (r6 * ((r9 >>> 2) & 7)) + r7
+        return
+
+
+@ in
+    @ r1: struct_0232EFE0
+    @ r2: buffer ??
+    @ r5,r6,r7,r8,r9,r10,r11,r12
+@ changed and not restored
+    @ r2
+    @ r5,r6,r7,r8,r9,r10,r11,r12
+@ changed but restored
+    @ r3
+    @ r4
+arm_func_start get_prev_sample_influence
+get_prev_sample_influence: @ 01fff7a4
+    ldmia      r2,{r5,r6,r7,r8,r9,r10,r11,r12}
+
+    r4 = struct_0232EFE0.lpc_codebook_0[struct_0232EFE0.lpc_codebook_0_id * 8 * sizeof(int16)]
+    bl         load_8r4_into_r5_to_r12
+    
+    r4 = struct_0232EFE0.lpc_codebook_1[struct_0232EFE0.lpc_codebook_1_id * 8 * sizeof(int16)]
+    bl         load_8r4_into_r5_to_r12
+
+    r4 = struct_0232EFE0.lpc_codebook_2[struct_0232EFE0.lpc_codebook_2_id * 8 * sizeof(int16)]
+    bl         load_8r4_into_r5_to_r12
+
+    r2 = struct_0232EFE0.lpc_filter_cur
+    stmia      r2,{r5,r6,r7,r8,r9,r10,r11,r12}
+
+
+    r5_1 += ((r5_0 * r6_0) >> #0xf)
+
+    r5_2 += ((r6_0 * r7_0) >> #0xf)
+    r6_1 += ((r5_1 * r7_0) >> #0xf)
+
+    r5_3 += ((r7_0 * r8_0) >> #0xf)
+    r6_2 += ((r6_1 * r8_0) >> #0xf)
+    r7_1 += ((r5_2 * r8_0) >> #0xf)
+
+    r5_4 += ((r8_0 * r9_0) >> #0xf)
+    r6_3 += ((r7_1 * r9_0) >> #0xf)
+    r7_2 += ((r6_2 * r9_0) >> #0xf)
+    r8_1 += ((r5_3 * r9_0) >> #0xf)
+
+    r5_5 += ((r9_0 * r10_0) >> #0xf)
+    r6_4 += ((r8_1 * r10_0) >> #0xf)
+    r7_3 += ((r7_2 * r10_0) >> #0xf)
+    r8_2 += ((r6_3 * r10_0) >> #0xf)
+    r9_1 += ((r5_4 * r10_0) >> #0xf)
+
+    r5_6 += ((r10_0 * r11_0) >> #0xf)
+    r6_5 += ((r9_1 * r11_0) >> #0xf)
+    r7_4 += ((r8_2 * r11_0) >> #0xf)
+    r8_3 += ((r7_3 * r11_0) >> #0xf)
+    r9_2 += ((r6_4 * r11_0) >> #0xf)
+    r10_1 += ((r5_5 * r11_0) >> #0xf)
+
+    r5_7 += ((r11_0 * r12_0) >> #0xf)
+    r6_6 += ((r10_1 * r12_0) >> #0xf)
+    r7_5 += ((r9_2 * r12_0) >> #0xf)
+    r8_4 += ((r8_3 * r12_0) >> #0xf)
+    r9_3 += ((r7_4 * r12_0) >> #0xf)
+    r10_2 += ((r6_5 * r12_0) >> #0xf)
+    r11_1 += ((r5_6 * r12_0) >> #0xf)
+
+    r5 = -(r5 >> 1)
+    r6 = -(r6 >> 1)
+    r7 = -(r7 >> 1)
+    r8 = -(r8 >> 1)
+    r9 = -(r9 >> 1)
+    r10 = -(r10 >> 1)
+    r11 = -(r11 >> 1)
+    r12 = -(r12 >> 1)
+    return
+
+
+@ in
+    @ r4: ptr to lpc_filter from lpc_codebook
+    @ r5,r6,r7,r8,r9,r10,r11,r12
+@ changed and not restored
+    @ r0,r3,r2
+    @ r5,r6,r7,r8,r9,r10,r11,r12
+@ changed but restored
+arm_func_start load_8r4_into_r5_to_r12
+load_8r4_into_r5_to_r12: @ 01fff914
+    r5 += (int16)r4[0]
+    r4 += 2
+    r6 += (int16)r4[0]
+    r4 += 2
+    r7 += (int16)r4[0]
+    r4 += 2
+    r8 += (int16)r4[0]
+    r4 += 2
+    r9 += (int16)r4[0]
+    r4 += 2
+    r10 += (int16)r4[0]
+    r4 += 2
+    r11 += (int16)r4[0]
+    r4 += 2
+    r12 += (int16)r4[0]
+    r4 += 2
+    return
+
+
+@ in
+    @ r0: aframe_buffer_bt
+    @ r1
+    @ r2: sample qty to treat
+@ changed and not restored
+    @ r2: 0
+@ changed but restored
+    @ r1
+    @ r3
+    @ r4
+    @ lr
+arm_func_start apply_prev_sample_influence
+apply_prev_sample_influence: @ 01fff958
+    stmdb      sp!,{r1,r3,r4,lr}
+    r1 = struct_0232EFE0.aframe_buffer_ptr
+
+    do
+        for i in range(8):
+            r4 = r0[0]
+            r0 += sizeof(int32)
+
+            r4 <<= 14
+            r4 += r5 * struct_0232EFE0.prev_sample[((7 + i) % 8) * sizeof(int32)]
+            r4 += r6 * struct_0232EFE0.prev_sample[((6 + i) % 8) * sizeof(int32)]
+            r4 += r7 * struct_0232EFE0.prev_sample[((5 + i) % 8) * sizeof(int32)]
+            r4 += r8 * struct_0232EFE0.prev_sample[((4 + i) % 8) * sizeof(int32)]
+            r4 += r9 * struct_0232EFE0.prev_sample[((3 + i) % 8) * sizeof(int32)]
+            r4 += r10 * struct_0232EFE0.prev_sample[((2 + i) % 8) * sizeof(int32)]
+            r4 += r11 * struct_0232EFE0.prev_sample[((1 + i) % 8) * sizeof(int32)]
+            r4 += r12 * struct_0232EFE0.prev_sample[((0 + i) % 8) * sizeof(int32)]
+            r4 >>= 14
+
+            struct_0232EFE0.prev_sample[i * sizeof(int32)] = r4
+            r1[0] = r4
+            r1 += sizeof(int32)
+        r2 -= 8
+    while r2 != 0
+
+    struct_0232EFE0.aframe_buffer_ptr = r1
+    ldmia      sp!,{r1,r3,r4,pc}
+
+
+@ in
+    @ r2: ptr to 8*int32
+@ changed and not restored
+    @ r2: += 8*4
+    @ r5-r12: average between itself and the 8 int32 from r2
+    @ lr: one int32 from r2
+@ changed but restored
+    @ r0: another int32 from r2
+arm_func_start average_8r2_with_r5_to_r12
+average_8r2_with_r5_to_r12: @ 01fffc20
+    r5 += r2[0]
+    r2 += #0x4
+    r6 += r2[0]
+    r2 += #0x4
+    r7 += r2[0]
+    r2 += #0x4
+    r8 += r2[0]
+    r2 += #0x4
+    r9 += r2[0]
+    r2 += #0x4
+    r10 += r2[0]
+    r2 += #0x4
+    r11 += r2[0]
+    r2 += #0x4
+    r12 += r2[0]
+    r2 += #0x4
+
+    r5 >>= 1
+    r6 >>= 1
+    r7 >>= 1
+    r8 >>= 1
+    r9 >>= 1
+    r10 >>= 1
+    r11 >>= 1
+    r12 >>= 1
+    return
+
+
+@ in
+    @ r1: struct_0232EFE0
+    @ r3: aframe_buffer_a
+    @ r4
+@ changed and not restored
+    @ r0
+    @ r2
+    @ r3
+    @ r5-r12
+@ changed but restored
+    @ r4: r1 structure (0x74)
+arm_func_start apply_prev_sample_influence_inter_frame
+apply_prev_sample_influence_inter_frame: @ 01fffc88
+    stmdb      sp!,{r1,r4,lr}
+    r0 = r3 + #0x200 @ aframe_buffer_bt
+    struct_0232EFE0.aframe_buffer_ptr = r4
+    
+    r2 = struct_0232EFE0.aframe_buffer_id
+    if r2 != 1:
+        r3 = &struct_0232EFE0.prev_sample_influence_afrbuf0
+        r4 = &struct_0232EFE0.prev_sample_influence_afrbuf1
+    else:
+        r4 = &struct_0232EFE0.prev_sample_influence_afrbuf0
+        r3 = &struct_0232EFE0.prev_sample_influence_afrbuf1
+    
+    @ r3 is ptr to current influence
+    @ r4 is ptr to previous influence
+    @ r5-r12 is working influence
+    
+    @ set fourth quarter influence
+    stmia      r3,{r5,r6,r7,r8,r9,r10,r11,r12}
+
+    @ set second quarter influence
+    r2 = r4
+    bl         average_8r2_with_r5_to_r12
+    stmdb      sp!,{r5,r6,r7,r8,r9,r10,r11,r12}
+
+    @ set first quarter influence
+    r2 = r4
+    bl         average_8r2_with_r5_to_r12
+    @ apply for first quarter
+    r2 = #0x20
+    bl         apply_prev_sample_influence
+
+    @ apply for second influence
+    ldmia      sp!,{r5,r6,r7,r8,r9,r10,r11,r12}
+    r2 = #0x20
+    bl         apply_prev_sample_influence
+
+    @ set third quarter influence
+    r2 = r3
+    bl         average_8r2_with_r5_to_r12
+    @ apply for third quarter
+    r2 = #0x20
+    bl         apply_prev_sample_influence
+
+    @ apply for fourth quarter
+    ldmia      r3,{r5,r6,r7,r8,r9,r10,r11,r12}
+    r2 = #0x20
+    bl         apply_prev_sample_influence
+
+    ldmia      sp!,{r1,r4,pc}
+
+
+@ in
+    @ r0: start addr
+    @ r1: length
+@ changed and not restored
+    @ ...
+@ changed but restored
+    @ ...
+arm_func_start FUN_020a92a8
+FUN_020a92a8: @ 020a92a8
+pc = lr
+
+
