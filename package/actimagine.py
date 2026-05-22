@@ -65,7 +65,7 @@ class ActImagine_ExportVXFolderIterator:
         self.audio_sample_rate = audio_sample_rate
         self.audio_streams_qty = audio_streams_qty
         self.folder_path = folder_path
-        self.audio_samples = np.array([], dtype=np.int32) # should be int16, but set to int32 for debug purposes
+        self.audio_samples = np.array([], dtype=np.int16)
         self.frame_number = 1
 
 
@@ -76,16 +76,13 @@ class ActImagine_ExportVXFolderIterator:
     def __next__(self):
         if len(self.avframes) == 0:
             if self.audio_streams_qty > 0:
-                # todo: clip audio to [-1, 1]
-                self.audio_samples *= 8
                 wavfile.write(os.path.join(self.folder_path, 'fullaudio.wav'), self.audio_sample_rate, self.audio_samples)
             raise StopIteration
         avframe = self.avframes.pop(0)
         avframe.vframe.export_image(os.path.join(self.folder_path, f"frame{self.frame_number:04d}.png"))
         if self.audio_streams_qty > 0:
-            logger.debug(avframe.get_audio_samples())
-            audio_s = np.array(avframe.get_audio_samples(), dtype=self.audio_samples.dtype)
-            logger.debug(audio_s)
+            iinfo = np.iinfo(self.audio_samples.dtype)
+            audio_s = np.clip(avframe.get_audio_samples(), iinfo.min, iinfo.max).astype(self.audio_samples.dtype)
             self.audio_samples = np.concatenate((self.audio_samples, audio_s), axis=0)
         self.frame_number += 1
 

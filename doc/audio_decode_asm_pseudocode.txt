@@ -100,65 +100,40 @@ DAT_027e029c:
 
 arm_func_start FUN_020bd6a0
 FUN_020bd6a0: @ 020bd6a0
-    stmdb      sp!,{lr}
-sp -= #0x4
-    cmp        r0,#0x0
-    addeq      sp,sp,#0x4
-    moveq      r0,#0x0
-    ldmiaeq    sp!,{lr}
-    bxeq       lr
-    bl         FUN_020bd9ec
-    cmp        r0,#0x1
-    moveq      r0,#0x1
-    movne      r0,#0x0
-sp += #0x4
-    ldmia      sp!,{lr}
-    bx         lr
+    if r0 == 0:
+        return 0
+    return FUN_020bd9ec()
 
 
+@ in
+    @ r0: struct_022D0020
+    @ r1
+@ changed and not restored
+@ changed but restored
+    @ r4
+@ out
+    @ r0: boolean value, is there still aframes to decode?
 arm_func_start FUN_020bd9ec
 FUN_020bd9ec: @ 020bd9ec
     stmdb      sp!,{r4,lr}
-r4 = r0
-r2 = r4[#0x100]
-r0 = r4[#0xfc]
-    cmp        r2,r0
-    moveq      r0,#0x0
-    ldmiaeq    sp!,{r4,lr}
-    bxeq       lr
-r2 = r4[#0x104]
-r0 = DAT_020bda88[0]
-r12 = r4[#0x34]
-r3 = r2 * r0
-r2 = r4[#0xb4]
-r2[r3] = r12
-r2 = r4[#0xb4]
-r3 = r4[#0x104]
-r2 += r3 * r0
-r2[#0x4] = r1
-r2 = r4[#0xb4]
-r1 = r4[#0x104]
-r0 = (r1 * r0) + r2
+    r4 = r0
+    if r4[#0x100] == r4[#0xfc]:
+        return 0
+    r2 = r4[#0xb4]
+    r3 = r4[#0x104]
+    r0 = r4[#0xb4] + (r4[#0x104] * sizeof(struct_0232EFE0))
+    r4[#0xb4][r4[#0x104] * sizeof(struct_0232EFE0)] = r4[#0x34] @ struct_0232EFE0.aframe_ptr
+    r4[#0xb4][r4[#0x104] * sizeof(struct_0232EFE0) + #0x4] = r1 @ struct_0232EFE0.channel_buffer_ptr
     bl         FUN_01fffd28
-r1 = r4[#0x34]
-r0 = r1 + r0
-r4[#0x34] = r0
-r0 = r4[#0x104]
-r0 += 1
-r4[#0x104] = r0
-r1 = r4[#0x104]
-r0 = r4[#0x20]
-    cmp        r1,r0
-    moveq      r0,#0x0
-    streq      r0,[r4,#0x104]
-r1 = r4[#0x100]
-r0 = 1
-r1 += 1
-r4[#0x100] = r1
-    ldmia      sp!,{r4,lr}
-    bx         lr
-DAT_020bda88:
-    .4byte 0x000014F4
+    r4[#0x34] += r0
+
+    r4[#0x104] += 1
+    if r4[#0x104] == r4[#0x20]:
+        r4[#0x104] = 0
+
+    r4[#0x100] += 1
+    return 1
+
 
 
 @ in
