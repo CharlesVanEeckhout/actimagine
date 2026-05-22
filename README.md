@@ -103,9 +103,7 @@ Anything else is internal to the library, so use at your own peril.
 
 ## Known Issues
 
-- The audio decoding is incomplete. Please don't use this library to extract audio yet. I would appreciate any help in understanding audio decoding.
-
-- Despite the incomplete audio decoding, I could create a basic audio encoding strategy. The audio produced by this strategy is of low quality and mono only. More investigation of audio decoding is required before better strategies can be added.
+- Despite the incomplete audio decoding, I could create a basic audio encoding strategy. The audio produced by this strategy is of low quality, mono only and causes unacceptable lag spikes when decoded by Mega Man ZX's audio decoding algorithm. Now that audio decoding is well understood, I will be able to refine this strategy and create new ones.
 
 - The current video encoding strategy produces an output that is large in filesize and laggy to play back on the DS. Video encoding strategies will be added that will be more efficient on those fronts.
 
