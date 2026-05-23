@@ -33,7 +33,7 @@ def import_vxfolder_and_save_vx(args):
     print('importing vx folder: complete')
     vframe_strategy = SimpleKeyframeOnly()
     aframe_strategy = SimplePulseExtend()
-    aframe_strategy.init_audio_extradata(act.audio_extradata)
+    aframe_strategy.init_audio_extradata(act.audio_extradata, act.get_aframes())
     for i, avframe in enumerate(act.avframes):
         avframe.encode(avframe.vframe.plane_buffers, vframe_strategy, aframe_strategy)
         print(f"encoding vx folder: frame {i+1}/{act.frames_qty}")

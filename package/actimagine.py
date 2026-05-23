@@ -359,3 +359,10 @@ class ActImagine:
 
         return ActImagine_ImportVXFolderIterator(self, folder_path, wav_data)
 
+
+    def get_aframes(self):
+        aframes = []
+        for avframe in self.avframes:
+            aframes += avframe.aframes
+        return aframes
+

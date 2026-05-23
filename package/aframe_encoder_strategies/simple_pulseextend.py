@@ -1,14 +1,15 @@
 
 from ..aframe import AFrame
 from ..aframe_data_handler import AFrameDataHandler
+from .aframe_encoder_strategy_abstract import AFrameEncoderStrategyAbstract
 
 
-class SimplePulseExtend:
+class SimplePulseExtend(AFrameEncoderStrategyAbstract):
     def __init__(self):
         pass
 
 
-    def init_audio_extradata(self, audio_extradata):
+    def init_audio_extradata(self, audio_extradata, aframes):
         audio_extradata['lpc_codebooks'] = []
         for i in range(3):
             audio_extradata['lpc_codebooks'].append([])
