@@ -60,23 +60,22 @@ def convert_image_to_frame(image):
         raise RuntimeError('image resolution is not a multiple of 2')
 
     frame = {
-        'y': np.zeros((frame_height, frame_width), dtype=np.uint8),
-        'u': np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint8),
-        'v': np.zeros((frame_height // 2, frame_width // 2), dtype=np.uint8)
+        "y": np.zeros((frame_height, frame_width), dtype=np.int16),
+        "u": np.zeros((frame_height, frame_width), dtype=np.int16),
+        "v": np.zeros((frame_height, frame_width), dtype=np.int16)
     }
+    a = np.asarray(image, dtype=np.int16)
+    r, g, b = [a[:, :, i] for i in range(3)]
+    frame["y"] += (2*r + 4*g + b + 3) // 7
+    frame["u"] += (b - frame["y"]) // 2 + 128
+    frame["v"] += (r - frame["y"]) // 2 + 128
 
-    for y in range(0, frame['y'].shape[0], 2):
-        for x in range(0, frame['y'].shape[1], 2):
-            yuv00 = convert_rgb_to_yuv(image.getpixel((x  , y  ))[:3])
-            yuv01 = convert_rgb_to_yuv(image.getpixel((x+1, y  ))[:3])
-            yuv10 = convert_rgb_to_yuv(image.getpixel((x  , y+1))[:3])
-            yuv11 = convert_rgb_to_yuv(image.getpixel((x+1, y+1))[:3])
-            frame['y'][y  ][x  ] = yuv00[0]
-            frame['y'][y  ][x+1] = yuv01[0]
-            frame['y'][y+1][x  ] = yuv10[0]
-            frame['y'][y+1][x+1] = yuv11[0]
-            frame['u'][y//2][x//2] = round((yuv00[1] + yuv01[1] + yuv10[1] + yuv11[1]) / 4)
-            frame['v'][y//2][x//2] = round((yuv00[2] + yuv01[2] + yuv10[2] + yuv11[2]) / 4)
+    frame["u"] = (frame["u"][0::2, 0::2] + frame["u"][0::2, 1::2] + frame["u"][1::2, 0::2] + frame["u"][1::2, 1::2] + 2) // 4
+    frame["v"] = (frame["v"][0::2, 0::2] + frame["v"][0::2, 1::2] + frame["v"][1::2, 0::2] + frame["v"][1::2, 1::2] + 2) // 4
+
+    frame["y"] = frame["y"].astype(np.uint8)
+    frame["u"] = frame["u"].astype(np.uint8)
+    frame["v"] = frame["v"].astype(np.uint8)
 
     return frame
 
